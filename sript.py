@@ -67,7 +67,6 @@ def retrieveTweetsFromFileSystem(file,directory,directory_of_directories):
         if not os.path.isdir(directory_of_directories):
             throw_error("INPUT ERROR","The directory {} doesn't exist".format(directory))
         for root, dirs, files in os.walk(directory_of_directories):  
-            print(dirs)
             for dir in dirs:
                 father_dir_name = "{}/{}".format(directory_of_directories,dir)
                 for root, dirs, files in os.walk(father_dir_name):  
@@ -111,15 +110,24 @@ def manage_replies(current_tweet_id,is_retweet,replied_tweet_id,replied_user_id,
             global_variables.tweets_without_replies_count +=1
 
 
-def check_if_is_retweet(retweeted,user_id):
+
+def check_if_is_retweet(retweeted,user_id,has_quote,quouted_tweet_id):
     if retweeted:
         num_retweets = increment_dict_counter(global_variables.local_user_retweets_counter,user_id)
         update_top_10_list(global_variables.local_most_retweets_users,(user_id,num_retweets))
         global_variables.retweets_count += 1
+        if has_quote:
+            global_variables.retweets_with_quotes_count +=1
+        else:
+            global_variables.retweets_without_quotes_count +=1
     else:
         num_tweets = increment_dict_counter(global_variables.local_user_tweets_counter,user_id)
         update_top_10_list(global_variables.local_most_tweets_users,(user_id,num_tweets),True)
         global_variables.tweets_count += 1
+        if has_quote:
+            global_variables.tweets_with_quotes_count +=1
+        else:
+            global_variables.tweets_without_quotes_count +=1
 
     num_messages = increment_dict_counter(global_variables.local_user_messages_counter,user_id)
     update_top_10_list(global_variables.local_most_messages_users,(user_id,num_messages))
@@ -135,9 +143,13 @@ def show_info():
 
     print("\nNumero de retweets con respuesta {}  (no existen)".format(global_variables.retweets_with_replies_count))
     print("Numero de retweets sin respuesta {}".format(global_variables.retweets_without_replies_count))
+    print("Numero de retweets con cita {}  ".format(global_variables.retweets_with_quotes_count))
+    print("Numero de retweets sin cita {}".format(global_variables.retweets_without_quotes_count))
 
     print("\nNumero de tweets con respuesta {}".format(global_variables.tweets_with_replies_count))
-    print("Numero de tweets sin respuesta {}\n".format(global_variables.tweets_without_replies_count))
+    print("Numero de tweets sin respuesta {}".format(global_variables.tweets_without_replies_count))
+    print("Numero de tweets con cita {}".format(global_variables.tweets_with_quotes_count))
+    print("Numero de tweets sin cita {}\n".format(global_variables.tweets_without_quotes_count))
 
     print("Numero de cuentas verificadas distintas de las que se han extraido tweets {}".format(len(global_variables.verified_account_dict_tweets)))
     print("Numero de mensajes de cuentas verificadas {}".format(global_variables.verified_account_messages))
@@ -168,9 +180,9 @@ def show_info():
     
     print("El tweet que más veces ha sido respondido por los mensajes que tenemos tiene {} respuestas".format(global_variables.local_most_replied_tweets[0][1]))
 
-    show_date_dicctionary_simple()
+    #show_date_dicctionary_simple()
 
-    print_num_tweets_per_date()
+    #print_num_tweets_per_date()
 
     print('\n\nMensajes analizados: {} Time: {}'.format(global_variables.messages_count,timeit.default_timer() - start))
 
@@ -186,12 +198,15 @@ def analyze_tweets(json_files):
             user_id = current_tweet_dict["user"]["id_str"]
             user_name = current_tweet_dict["user"]["name"]
             user_nickname = current_tweet_dict["user"]["screen_name"]
+            is_retweet = current_tweet_dict.get("retweeted_status",False)
+            has_quote = current_tweet_dict.get("is_quote_status",False)
+            quoted_tweet_id = current_tweet_dict.get("quoted_status_id_str",False)
 
             add_to_user_dict(user_id,user_name,user_nickname)
                 
             global_variables.tweets_dict[tweet_id] = current_tweet_dict
 
-            check_if_is_verified(user_id,current_tweet_dict['user']["verified"],current_tweet_dict.get("retweeted_status",False))
+            check_if_is_verified(user_id,current_tweet_dict['user']["verified"],is_retweet)
             #check_polarity(tweet_dict[])
             check_way_of_send(current_tweet_dict["source"])
 
@@ -205,8 +220,10 @@ def analyze_tweets(json_files):
             update_top_10_list(global_variables.global_most_followers_users,(user_id,current_tweet_dict["user"]["followers_count"]))
             
             global_variables.messages_count +=1
-            check_if_is_retweet(current_tweet_dict.get("retweeted_status",False),user_id)
-            manage_replies(tweet_id,current_tweet_dict.get("retweeted_status",False),current_tweet_dict.get("in_reply_to_status_id_str",False),current_tweet_dict.get("in_reply_to_user_id_str",False),current_tweet_dict.get("in_reply_to_screen_name",False))
+            
+            check_if_is_retweet(is_retweet,user_id,has_quote,quoted_tweet_id)
+            manage_replies(tweet_id,is_retweet,current_tweet_dict.get("in_reply_to_status_id_str",False),current_tweet_dict.get("in_reply_to_user_id_str",False),current_tweet_dict.get("in_reply_to_screen_name",False))
+            
             fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
             insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)
 

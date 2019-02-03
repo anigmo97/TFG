@@ -88,9 +88,10 @@ def insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto):
             if minuto not in global_variables.tweets_by_date_dict[fecha][hora]:
                 global_variables.tweets_by_date_dict[fecha][hora].update(min_dict)
             else:
-                #posible mejora: mirar los segundos y son 30 o mas insertar por el final
+                # posible mejora1: mirar los segundos y son 30 o mas insertar por el final
                 # y si son de 0 a 29 insertar por el principio
-                # posible ejora 2 insertar tupla (tweet_id,segs)
+                # posible mejora 2 insertar tupla (tweet_id,segs)
+                # posible mejora 3 lista con 12 listas (intervalos de 5 segs)
                 global_variables.tweets_by_date_dict[fecha][hora][minuto] += [tweet_id] 
     
 

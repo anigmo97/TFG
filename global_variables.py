@@ -11,9 +11,16 @@ retweets_count = 0
 
 tweets_with_replies_count = 0
 tweets_without_replies_count = 0
+tweets_with_quotes_count = 0
+tweets_without_quotes_count = 0
 
 retweets_with_replies_count = 0
 retweets_without_replies_count = 0
+retweets_with_quotes_count = 0
+retweets_without_quotes_count = 0
+
+#quote tweet
+#entities	(hashtags,media,urls,user_mentions,symbols)
 
 verified_account_messages = 0
 verified_account_tweets = 0
@@ -49,7 +56,7 @@ local_user_messages_counter = {} # dict [user] -> num_mensajes_analizados
 local_user_tweets_counter = {} # dict [user] -> num_tweets_analizados
 local_user_retweets_counter = {} # dict [user] -> num_retweets_analizados
 local_followers_counter = {} #INVESTIGATE HOW TO GET FOLLOWERS LIST
-local_replied_users_counter = {} # dict [user] -> num_tweets_que le responden
+local_replied_users_counter = {} # dict [user] -> num_tweets que tenemos que le responden
 local_replied_tweets_couter = {} # dict [tweet_id] -> num_respuestas que nosotros tenemos 
 
 
