@@ -55,6 +55,7 @@ def throw_error(module_name, error_message):
 def isJsonFile(filename):
     return filename[-5:]==".json"
 
+# IF THE USER NOT IN THE DICT IT THROWS AN EXCEPTION
 def get_one_screen_name(user_id):
     return global_variables.users_dict[user_id]["screen-names"][0]
 
@@ -62,7 +63,6 @@ def get_top_user(top_10_list):
     user_id,amount = top_10_list[0]
     screen_name = get_one_screen_name(user_id)
     return user_id,screen_name,amount
-
 
 
 def increment_dict_counter(dictionary,id):
@@ -93,7 +93,29 @@ def insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto):
                 # posible mejora 2 insertar tupla (tweet_id,segs)
                 # posible mejora 3 lista con 12 listas (intervalos de 5 segs)
                 global_variables.tweets_by_date_dict[fecha][hora][minuto] += [tweet_id] 
-    
+
+def is_user(id):
+    if id in global_variables.users_dict:
+        return True
+    elif id in global_variables.tweets_dict:
+        return False
+    else:
+        return None
+
+def is_tweet(id):
+    if id in global_variables.users_dict:
+        return False
+    elif id in global_variables.tweets_dict:
+        return True
+    else:
+        return None    
+
+###################################################################################################################################
+###################################################################################################################################
+################################################# DEBUG METHODS ###################################################################
+################################################# It doesn't add functionality ####################################################
+###################################################################################################################################
+
 
 def show_date_dicctionary():
     for fecha,dict_horas in global_variables.tweets_by_date_dict.items():
@@ -104,12 +126,14 @@ def show_date_dicctionary():
 def show_date_dicctionary_simple():
     count_local = 0
     try:
+        print("\n\nNum     Diccionario1  Diccionario2    Diccionario3     Value Diccionario3")
+        print("         key=fecha      key=hora       key=minuto")
         for fecha,dict_horas in global_variables.tweets_by_date_dict.items():
             for hora,dict_mins in dict_horas.items():
                 for minuto,tweets_ids in dict_mins.items():
                     count_local+=1
-                    print("[{}]  fecha {} - hora {}:{}  [tweets_ids_list]".format(count_local,fecha,hora,minuto))
-                    if count_local > 20:
+                    print("{0:<8} {1:<14}->  {2:<10} -> {3:<8}     [tweets_ids_list]".format(count_local,fecha,hora,minuto))
+                    if count_local >= 20:
                         raise Exception  
     except:
         pass  
@@ -122,4 +146,36 @@ def print_num_tweets_per_date():
                 count_local+=len(tweets_ids)
     print(count_local)
         
-    
+
+def print_top_10_list(lista,titulo):
+    print(titulo)
+    print("{0:>30} {1:>20}{2:>15}    {3:<20}      {4:<15}".format("ID","AMOUNT","IN USERS DICT", "IN TWEETS DICT","USER"))
+    for index,(id,amount) in enumerate(lista,1):
+        res1 = global_variables.users_dict.get(id,False)
+        res2 = global_variables.tweets_dict.get(id,False)
+        if res1!= False:
+            user = get_one_screen_name(id)
+        elif res2 != False:
+            user = global_variables.tweets_dict[id]["user"]["screen_name"]
+        else:
+            user = "unknown"
+        print("{0:<3}   {1:>34}  {2:<15} {3:<15} {4:>4} {5:>25}".format(index,id,amount,str(res1!=False),str(res2!=False),user))
+    print("\n\n\n")
+
+def print_all_top_ten_lists():
+    print_top_10_list(global_variables.global_most_favs_tweets,"tweets con mas likes")
+    print_top_10_list(global_variables.global_most_favs_users,"usuarios que mas likes dan")
+    print_top_10_list(global_variables.global_most_followers_users,"usuarios con mas followers")
+    print_top_10_list(global_variables.global_most_rt_tweets,"tweets con mas retweets")
+    print_top_10_list(global_variables.global_most_tweets_users,"usuarios con mas tweets publicados")
+
+    # top 10 referente a nuestro conjunto de datos y sus estadisticas internas
+    print_top_10_list(global_variables.local_most_messages_users,"usuarios de los que tenemos mas mensajes ( entre tweets y retweets")
+    print_top_10_list(global_variables.local_most_retweets_users,"usuarios de los cuales tenemos mas retweets")
+    print_top_10_list(global_variables.local_most_tweets_users,"usuarios de los cuales tenemos mas tweets")
+
+    print_top_10_list(global_variables.local_most_replied_tweets,"tweets para los cuales tenemos mas respuestas")
+    print_top_10_list(global_variables.local_most_replied_users,"usuarios para los cuale tenemos mas respuestas")
+  
+    #print_top_10_list(global_variables.local_most_favs_users,"")
+    #print_top_10_list(global_variables.local_most_followers_users,"usuarios de los cuales tenemos mas followers")
