@@ -48,11 +48,13 @@ def show_info():
     print("El usuario del cual tenemos mas retweets es '@{}' con {} retweets\n".format(get_top_user(global_variables.local_most_retweets_users)[1],get_top_user(global_variables.local_most_retweets_users)[2]))
 
     print("El usuario que más veces ha sido respondido por los mensajes que tenemos es '@{}' con {} respuestas".format(get_top_user(global_variables.local_most_replied_users)[1],get_top_user(global_variables.local_most_replied_users)[2]))
-    
-    print("El tweet que más veces ha sido respondido por los mensajes que tenemos tiene {} respuestas".format(global_variables.local_most_replied_tweets[0][1]))
+    print("El tweet que más veces ha sido respondido por los mensajes que tenemos tiene {} respuestas\n".format(global_variables.local_most_replied_tweets[0][1]))
 
+    print("El usuario que más veces ha sido citado en por los mensajes que tenemos es '@{}' con {} citas".format(get_top_user(global_variables.local_most_quoted_users)[1],get_top_user(global_variables.local_most_quoted_users)[2]))
+    print("El tweet que más veces ha sido citado por los mensajes que tenemos tiene {} citas\n".format(global_variables.local_most_quoted_tweets[0][1]))
     #show_date_dicctionary_simple() # muestra un ejemplo de registros del diccionario de tweets indexados por fecha
     #print_num_tweets_per_date() # suma el numero de tweets indexados guardados en el deiccionario de fechas
-    #print_all_top_ten_lists() # printa los distintos top e una forma mas humana
+    print_all_top_ten_lists() # printa los distintos top e una forma mas humana
+
 
     

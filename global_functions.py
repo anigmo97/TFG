@@ -55,9 +55,13 @@ def throw_error(module_name, error_message):
 def isJsonFile(filename):
     return filename[-5:]==".json"
 
-# IF THE USER NOT IN THE DICT IT THROWS AN EXCEPTION
 def get_one_screen_name(user_id):
-    return global_variables.users_dict[user_id]["screen-names"][0]
+    nickname = "unknown"
+    if user_id in global_variables.users_dict:
+        if "screen-names" in global_variables.users_dict[user_id]:
+            nickname = global_variables.users_dict[user_id]["screen-names"][0]
+
+    return nickname
 
 def get_top_user(top_10_list):
     user_id,amount = top_10_list[0]
@@ -153,12 +157,20 @@ def print_top_10_list(lista,titulo):
     for index,(id,amount) in enumerate(lista,1):
         res1 = global_variables.users_dict.get(id,False)
         res2 = global_variables.tweets_dict.get(id,False)
+        res3 = global_variables.quotes_dict.get(id,False)
+        res4 = global_variables.retweets_dict.get(id,False)
         if res1!= False:
-            user = get_one_screen_name(id)
+            userId = id
         elif res2 != False:
-            user = global_variables.tweets_dict[id]["user"]["screen_name"]
+            userId = global_variables.tweets_dict[id]["user"]["id_str"]
+        elif res3 != False: 
+            userId = global_variables.quotes_dict[id]["user"]["id_str"]
+        elif res4 != False:
+            userId = global_variables.retweets_dict[id]["user"]["id_str"]
         else:
-            user = "unknown"
+            userId = "unknown"
+        user = get_one_screen_name(userId)
+
         print("{0:<3}   {1:>34}  {2:<15} {3:<15} {4:>4} {5:>25}".format(index,id,amount,str(res1!=False),str(res2!=False),user))
     print("\n\n\n")
 
@@ -176,6 +188,9 @@ def print_all_top_ten_lists():
 
     print_top_10_list(global_variables.local_most_replied_tweets,"tweets para los cuales tenemos mas respuestas")
     print_top_10_list(global_variables.local_most_replied_users,"usuarios para los cuale tenemos mas respuestas")
-  
+    
+    print_top_10_list(global_variables.local_most_quoted_tweets,"tweets para los cuales tenemos mas citas")
+    print_top_10_list(global_variables.local_most_quoted_users,"usuarios para los cuales tenemos mas citas")
+
     #print_top_10_list(global_variables.local_most_favs_users,"")
     #print_top_10_list(global_variables.local_most_followers_users,"usuarios de los cuales tenemos mas followers")

@@ -89,7 +89,7 @@ def add_to_user_dict(user_id,name,nickname):
         if nickname not in screen_names:
             global_variables.users_dict[user_id]["screen-names"] = screen_names + [nickname]
 
-def check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,quoted_tweet_id,replied_tweet_id,replied_user_id,replied_user_screen_name):
+def check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,replied_tweet_id,replied_user_id,replied_user_screen_name):
     if is_retweet:
         if replied_tweet_id not in [False,None]  : # es una respuesta
             global_variables.retweets_with_replies_count +=1
@@ -103,7 +103,7 @@ def check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,quoted
             add_to_user_dict(replied_user_id,None,replied_user_screen_name)
             if has_quote:
                 global_variables.retweets_with_quotes_count +=1
-                global_variables.retweets_with_replies_and_quotes_count
+                global_variables.retweets_with_replies_and_quotes_count+=1
             else:
                 global_variables.retweets_without_quotes_count +=1
         else:
@@ -137,7 +137,11 @@ def check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,quoted
                 global_variables.tweets_without_quotes_count +=1
 
 
-
+def is_quoted_tweet(quote_id):
+    if quote_id== False or quote_id == None:
+        return False
+    else:
+        return True
 
 
 
@@ -169,7 +173,24 @@ def analyze_tweets(json_files):
             # Check if is retweet or not
             is_retweet = current_tweet_dict.get("retweeted_status",False)
             # Quotes info
-            has_quote = current_tweet_dict.get("is_quote_status",False)
+            #has_quote = current_tweet_dict.get("is_quote_status",False)
+            has_quote = is_quoted_tweet(current_tweet_dict.get("quoted_status",False))
+            if has_quote:
+                quoted_user_id = current_tweet_dict["quoted_status"]["user"]["id_str"]
+                quoted_user_name = current_tweet_dict["quoted_status"]["user"]["name"]
+                quoted_user_nickname = current_tweet_dict["quoted_status"]["user"]["screen_name"]
+                quoted_tweet_id = current_tweet_dict["quoted_status"]["id_str"]
+                #print(quoted_user_id,quoted_user_name,quoted_user_nickname)
+                #input()
+                global_variables.quotes_dict[quoted_tweet_id] = current_tweet_dict["quoted_status"]
+                add_to_user_dict(quoted_user_id,quoted_user_name,quoted_user_nickname)
+                num_quotes_tweet = increment_dict_counter(global_variables.local_quoted_tweets_counter,quoted_tweet_id)
+                update_top_10_list(global_variables.local_most_quoted_tweets,(quoted_tweet_id,num_quotes_tweet))
+
+                num_quotes_user = increment_dict_counter(global_variables.local_quoted_users_counter,quoted_user_id)
+                update_top_10_list(global_variables.local_most_quoted_users,(quoted_user_id,num_quotes_user)) 
+                
+                
             quoted_tweet_id = current_tweet_dict.get("quoted_status_id_str",False)
             # Replies info
             replied_tweet_id = current_tweet_dict.get("in_reply_to_status_id_str",False) # it's the way to known if is a reply
@@ -205,7 +226,7 @@ def analyze_tweets(json_files):
             global_variables.messages_count +=1
             
             check_if_is_retweet(tweet_id,is_retweet,user_id)
-            check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,quoted_tweet_id,replied_tweet_id,replied_user_id,replied_user_nickname)
+            check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,replied_tweet_id,replied_user_id,replied_user_nickname)
 
             fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
             insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)

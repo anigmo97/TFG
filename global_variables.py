@@ -34,7 +34,9 @@ not_verified_account_retweets = 0
 
 tweets_by_polarity = [0,0,0,0,0,0] #TODO
 
-tweets_dict = {}
+tweets_dict = {} #contains the captured messages
+retweets_dict = {} #contains tweets that was retweeted in our captured messages
+quotes_dict = {} #contains tweets that was quoted in our captured messages
 users_dict = {}
 verified_account_dict_tweets = {}
 not_verified_account_dict_tweets = {}
@@ -59,7 +61,10 @@ local_user_tweets_counter = {} # dict [user] -> num_tweets_analizados
 local_user_retweets_counter = {} # dict [user] -> num_retweets_analizados
 local_followers_counter = {} #INVESTIGATE HOW TO GET FOLLOWERS LIST
 local_replied_users_counter = {} # dict [user] -> num_tweets que tenemos que le responden
-local_replied_tweets_couter = {} # dict [tweet_id] -> num_respuestas que nosotros tenemos 
+local_replied_tweets_couter = {} # dict [tweet_id] -> num_respuestas que nosotros tenemos
+
+local_quoted_tweets_counter = {}  # dict [tweet_id] -> num_tweets que tenemos que le citan
+local_quoted_users_counter = {}  # dict [user] -> num_tweets que tenemos que le responden
 
 
 local_most_messages_users = create_top_ten_list()
@@ -68,6 +73,10 @@ local_most_retweets_users = create_top_ten_list()
 
 local_most_favs_users = create_top_ten_list() #INVESTIGATE HOW TO GET WHO'S LIKE A TWEET
 local_most_followers_users = create_top_ten_list() #INVESTIGATE HOW TO GET FOLLOWERS LIST
+
 local_most_replied_users = create_top_ten_list()
 local_most_replied_tweets = create_top_ten_list()
+
+local_most_quoted_users = create_top_ten_list()
+local_most_quoted_tweets = create_top_ten_list()
 
