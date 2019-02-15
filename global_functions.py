@@ -19,7 +19,8 @@ def create_top_ten_list():
 #             lista[i] = tuple_id_amount
 #             i-=1
 
-
+def toJSON(item):
+    return item._json
 
 def update_top_10_list(lista,tuple_id_amount,show=False):
     def get_id_pos(local_id):
@@ -79,6 +80,10 @@ def get_utc_time_particioned(date,utc_offset=9):
     datetime_object = datetime.strptime(date, '%a %b %d %H:%M:%S +0000 %Y') + timedelta(hours=utc_offset)
     return datetime_object.strftime("%Y-%m-%d"),datetime_object.hour,datetime_object.minute
     # [yyyy-mm-dd] -> dict[hh] -> dic[min] -> list[tweet_id1...]
+
+#twitter usa horario pdt lo que son 9 horas mas en españa
+def get_utc_time(date,utc_offset=9):
+    return datetime.strptime(date, '%a %b %d %H:%M:%S +0000 %Y') + timedelta(hours=utc_offset)
 
 def insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto):
     min_dict = { minuto:[tweet_id] }
