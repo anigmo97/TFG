@@ -29,6 +29,8 @@ class StreamListener(tweepy.StreamListener):
         self.start_time = time.time()
         self.message_timer = Timer(5,self.show_messages_info)
         self.message_timer.start()
+        self.time_timer = Timer(max_mins*10,self.finalize_by_time)
+        self.time_timer.start()
         # self.client = MongoClient(mongo_conector.MONGO_HOST)
         # # Use twitterdb database. If it doesn't exist, it will be created.
         # self.db = self.client.twitterdb
@@ -42,6 +44,9 @@ class StreamListener(tweepy.StreamListener):
         # Called initially to connect to the Streaming API
         print("You are now connected to the streaming API.")
     
+    def finalize_by_time(self):
+        self.on_disconnect("Se ha agotado el tiempo maximo especificado por el usuario")
+
     def on_disconnect(self, notice):
         self.message_timer.cancel()
         print(notice)
@@ -77,17 +82,35 @@ class StreamListener(tweepy.StreamListener):
 
  
 
-def collect_tweets(max_tweets=3000,query="#science",filename="tweets"): 
+def collect_tweets_by_query_and_save_in_file(max_tweets=3000,query="#science",filename="tweets"): 
         API = tweepy.API(auth)
-        tweets_list = [status._json for status in tweepy.Cursor(API.search, q=query,count=100,lang="es", since="2017-04-03").items(max_tweets)]
+        cursor_respuestas = tweepy.Cursor(API.search, q=query,count=1000,lang="es", since="2017-04-03").items(max_tweets)
+        tweets_list = [status._json for status in cursor_respuestas]
         
         with open('tweets/{}{}.json'.format(filename,now.strftime("%Y-%m-%d__%H-%M")), 'w', encoding='utf8') as file:
             file.writelines(json.dumps(tweets_list,indent=4, sort_keys=True))
         
         print("{} tweets capturados".format(len(tweets_list)))
+
+        return tweets_list
         #dumps -> dump string
 
-def collect_tweets_by_streamming(WORDS=[],max_tweets=10000,max_mins=2):
+
+def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",filename="tweets"): 
+        API = tweepy.API(auth)
+        mongo_tweets_list = [] 
+        for status in tweepy.Cursor(API.search, q=query,count=100,lang="es", since="2017-04-03").items(max_tweets):
+            tweet = status._json
+            if(tweet.get("id_str",False) != False):
+                tweet["_id"]= tweet["id_str"]
+                mongo_tweets_list.append(tweet)
+        mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_list)
+        print("{} tweets capturados".format(len(mongo_tweets_list)))
+        return  mongo_tweets_list
+
+
+def collect_tweets_by_streamming_and_save_in_mongo(WORDS=[],max_tweets=10000,max_mins=2):
+    print("words {}\t max_tweets {} \t max_mins {}".format(WORDS,max_tweets,max_mins))
     API = tweepy.API(wait_on_rate_limit=True)
     listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins) 
     streamer = tweepy.Stream(auth=auth, listener=listener)
@@ -168,6 +191,6 @@ if __name__ == '__main__':
     #     get_tweets()
     #     time.sleep(1200) # sleep 20 min
 
-    #collect_tweets_by_streamming(["red"])
+    #collect_tweets_by_streamming_and_save_in_mongo(["red"])
 
     get_specifics_tweets_from_api(mongo_conector.get_tweet_ids_list_from_database())

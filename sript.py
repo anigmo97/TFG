@@ -6,9 +6,9 @@ import os
 import timeit
 # USER MODULES IMPORTS
 import global_variables
-from global_functions import update_top_10_list,throw_error,notNone,isJsonFile,increment_dict_counter
-from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict
-from logger import show_info
+from global_functions import update_top_10_list,throw_error,notNone,checkParameter,isJsonFile,increment_dict_counter
+from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict,create_dir_if_not_exits
+from logger import show_info,show_parameters
 import consumer
 
 
@@ -246,20 +246,53 @@ if __name__ == "__main__":
     start = timeit.default_timer()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-f", "--file", help="input json file",type=str)
-    parser.add_argument("-o","--output_file",help="choose name for file with results", type=str)
-    parser.add_argument("-D","-d","--directory", help="directory of input json files", type=str)
-    parser.add_argument("-DD","-dd","--directory_of_directories", help="father directory of json directories", type=str)
-    parser.add_argument("-up","-UP","--update",action='store_true')
-    parser.add_argument("-l","-L","--live",action='store_true',help="get tweets from twitter and then analyze them")
-    parser.add_argument("-u","-U","--usage",action='store_true')
+    parser.add_argument("-f", "-F","--file", help="input json file",type=str)
+    parser.add_argument("-d","-D","--directory", help="directory of input json files", type=str)
+    parser.add_argument("-dd","-DD","--directory_of_directories", help="father directory of json directories", type=str)
+    #TODO añadir mdb option
+
+    parser.add_argument("-o","-O","--output_file",help="choose name for file with results", type=str)
+
+    parser.add_argument("-up","-UP","--update",help="update your tweets in mongoDb before calculate stadistics",action='store_true')
+    parser.add_argument("-s","-S","--streamming",help="get tweets from twitter API by streamming save it in mongoDb and then analyzes them",action='store_true')
+    parser.add_argument("-q","-Q","--query",help="get tweets from twitter API by query save it in mongoDb and then analyzes them", type=str)
+    parser.add_argument("-qf","-QF","--query_file",help="get tweets from twitter API by query save it in a file and then analyzes them", type=str)
+
+    parser.add_argument("-w","-W","--words",nargs='+',help="specify words that should be used in the collected tweets.This option has to be used in streamming",type=str)
+    parser.add_argument("-mm","-MM","--max_messages",help="specify maximum num of messages to collect",type=int)
+    parser.add_argument("-mt","-MT","--max_time",help="specify maximum time of collecting in minutes.This option has to be used in streamming",type=int)
+
     parser.add_argument("-e","-E","--examples",action='store_true')
     args = parser.parse_args()
+    show_parameters(args)
     file_mode = True
-    if notNone(args.file) + notNone(args.directory) + notNone(args.directory_of_directories) > 1:
+    if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
-    elif notNone(args.file) + notNone(args.directory) + notNone(args.directory_of_directories) == 1:
+    elif checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
+        if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) >0:
+            throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
         tweets_files_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
-    else: 
-        pass # check live option
+    elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
+        throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' o -qf de forma simultanea ")
+    elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) == 1:
+        if checkParameter(args.query):
+            if checkParameter(args.words) + checkParameter(args.max_time) > 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt")
+            else:
+                args.query="#"+args.query
+                tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(args.max_messages or 3000,args.query_file or "#python")
+                #leer los tweets de mongo
+        elif checkParameter(args.query_file):
+            if checkParameter(args.words) + checkParameter(args.max_time) > 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt")
+            else:
+                create_dir_if_not_exits("tweets")
+                args.query_file="#{}".format(args.query_file)
+                tweets_files_list = consumer.collect_tweets_by_query_and_save_in_file(args.max_messages or 3000,args.query_file or "#python")
+                # leer los tweets 
+        else:
+            consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or [], args.max_messages or 10000, args.max_time or 10)
+    else:
+        throw_error(sys.modules[__name__],"Se debe usar al menos una opcion de las siguientes: -f -d -dd (toman mensajes del sistema de archivos )\n o -d -q -qf (toman mensajes del api y despues los analizan) ")
+
     analyze_tweets(tweets_files_list)

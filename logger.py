@@ -57,4 +57,16 @@ def show_info():
     print_all_top_ten_lists() # printa los distintos top e una forma mas humana
 
 
-    
+
+def show_parameters(args):
+    print("args.file = {}".format(args.file))
+    print("args.directory = {}".format(args.directory))
+    print("args.directory_of_directories = {}".format(args.directory_of_directories))
+    print("args.output_file = {}".format(args.output_file))
+    print("args.update = {}".format(args.update))
+    print("args.streamming = {}".format(args.streamming))
+    print("args.query = {}".format(args.query))
+    print("args.query_file = {}".format(args.query_file))
+    print("args.words = {}".format(args.words))
+    print("args.max_messages = {}".format(args.max_messages))
+    print("args.max_time = {}".format(args.max_time))

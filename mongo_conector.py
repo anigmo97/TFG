@@ -17,3 +17,7 @@ def update_many_tweets_dicts_in_mongo(tweets_list):
     for tweet in tweets_list:
         tweet_id = tweet["id_str"]
         db.tweets.replace_one({"_id" : tweet_id },tweet)
+
+
+def insertar_multiples_tweets_en_mongo(mongo_tweets_list):
+    db.tweets.insert_many(mongo_tweets_list)

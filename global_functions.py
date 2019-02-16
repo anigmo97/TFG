@@ -1,4 +1,5 @@
 import global_variables
+import os
 from datetime import datetime,timedelta
 
 
@@ -18,6 +19,9 @@ def create_top_ten_list():
 #             lista[i+1] = lista[i]
 #             lista[i] = tuple_id_amount
 #             i-=1
+def create_dir_if_not_exits(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
 def toJSON(item):
     return item._json
@@ -48,6 +52,12 @@ def update_top_10_list(lista,tuple_id_amount,show=False):
 
 def notNone(value):
     return value != None
+    
+def checkParameter(parameter):
+    if parameter == None or parameter == False:
+        return 0
+    else:
+        return 1
 
 def throw_error(module_name, error_message):
     print("\n\n\n [{}] {}".format(module_name,error_message))
