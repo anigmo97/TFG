@@ -15,3 +15,9 @@ db.tweets.count()
 
 #find
 db.tweets.find()
+
+# gets document id of documents
+db.tweets.find({},{_id:1})
+
+# drop a collection
+db.tweets.drop()

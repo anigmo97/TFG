@@ -9,6 +9,7 @@ import global_variables
 from global_functions import update_top_10_list,throw_error,notNone,isJsonFile,increment_dict_counter
 from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict
 from logger import show_info
+import consumer
 
 
 patron_way_of_send = u"rel(.*)>([\s\S]*?)<(.*)"
@@ -157,6 +158,8 @@ def check_if_is_retweet(tweet_id,retweeted,user_id):
 
     num_messages = increment_dict_counter(global_variables.local_user_messages_counter,user_id)
     update_top_10_list(global_variables.local_most_messages_users,(user_id,num_messages))
+
+        
 
 
 

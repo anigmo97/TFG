@@ -5,9 +5,11 @@ import time
 from pymongo import MongoClient
 import global_variables
 from global_functions import get_utc_time
+import mongo_conector
+from threading import Timer
 
 now = datetime.datetime.now()
-MONGO_HOST= 'mongodb://localhost/tweet'
+
 
 
 consumer_key = ""
@@ -19,19 +21,31 @@ auth.set_access_token(access_token, access_secret)
 
 class StreamListener(tweepy.StreamListener):    
     #This is a class provided by tweepy to access the Twitter Streaming API. 
+    
     def __init__(self,api=None,max_tweets=10000,max_mins=10):
         self.streamming_tweets = 0
         self.max_mins = max_mins
         self.max_tweets = max_tweets
-        self.client = MongoClient(MONGO_HOST)
+        self.start_time = time.time()
+        self.message_timer = Timer(2,self.show_messages_info)
+        self.message_timer.start()
+        # self.client = MongoClient(mongo_conector.MONGO_HOST)
+        # # Use twitterdb database. If it doesn't exist, it will be created.
+        # self.db = self.client.twitterdb
+
+    def show_messages_info(self):
+        print("{} tweets collected in {:.0f} seconds".format(self.streamming_tweets,(time.time() - self.start_time )))
+        self.message_timer.run()
+
     
     def on_connect(self):
         # Called initially to connect to the Streaming API
         print("You are now connected to the streaming API.")
     
     def on_disconnect(self, notice):
+        self.message_timer.cancel()
         print(notice)
-        print("You are now disconnected to the streaming API.")
+        print("You are now disconnected to the streaming API.\n\n")
 
     def on_error(self, status_code):
         # On error - if an error occurs, display the error / status code
@@ -43,27 +57,22 @@ class StreamListener(tweepy.StreamListener):
         pass
 
     def on_data(self, data):
-         
         try:
-            
-            # Use twitterdb database. If it doesn't exist, it will be created.
-            db = self.client.twitterdb
-    
             # Decode the JSON from Twitter
-            datajson = json.loads(data)
- 
-            #print out a message to the screen that we have collected a tweet
-            print("Tweet collected at " + str(get_utc_time(datajson['created_at'])))
-            
+            datajson = get_mongo_document(data)
             #insert the data into the mongoDB into a collection called tweets
-            #if twitter_search doesn't exist, it will be created.
-            db.tweets.insert(datajson)
-            self.streamming_tweets += 1
-            if(self.streamming_tweets > self.max_tweets):
-                self.on_disconnect("User disconnected after get the required amount of tweets")
-                return False # paramos el streamming
+            #if tweets doesn't exist, it will be created.
+            if datajson is not None:
+                mongo_conector.db.tweets.insert(datajson) # cambiar por insert many
+                if(self.streamming_tweets > self.max_tweets):
+                    print("\n\n{} messages has been collected".format(self.streamming_tweets))
+                    self.on_disconnect("User disconnected after get the required amount of tweets")
+                    return False # paramos el streamming
+                self.streamming_tweets += 1
         except Exception as e:
-           print(e)
+           print("[ON DATA] {} {}".format(e,e.__cause__))
+        
+
 
 
  
@@ -78,17 +87,33 @@ def get_tweets(max_tweets=3000,query="#science",filename="tweets"):
         print("{} tweets capturados".format(len(tweets_list)))
         #dumps -> dump string
 
-def get_tweets_by_streamming(WORDS=[],max_tweets=300,max_mins=2):
+def get_tweets_by_streamming(WORDS=[],max_tweets=100,max_mins=2):
     API = tweepy.API(wait_on_rate_limit=True)
     listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins) 
     streamer = tweepy.Stream(auth=auth, listener=listener)
     print("Tracking: " + str(WORDS))
     if len(WORDS) > 0:
-        streamer.filter(languages=["en","es"],track=WORDS)
+        streamer.filter(languages=["en","es"],track=WORDS,is_async=True)
+    else:
+        streamer.filter(languages=["en","es"],is_async=True)
+        #REVISAR
+        #streamer.filter(languages=["en","es"],async=True)
+
+def get_mongo_document(json_tweet):
+    try:
+        tweet_dict = json.loads(json_tweet)
+        tweet_id = tweet_dict["id_str"]
+        tweet_dict["_id"]= tweet_id
+    except Exception:
+        print(json.dumps(tweet_dict,indent=4, sort_keys=True))
+        return None
+    return tweet_dict
+
+
   
 if __name__ == '__main__': 
     # while True:
     #     get_tweets()
     #     time.sleep(1200) # sleep 20 min
-    get_tweets_by_streamming("red")
+    get_tweets_by_streamming(["red"])
     
