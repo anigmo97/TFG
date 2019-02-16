@@ -21,3 +21,9 @@ db.tweets.find({},{_id:1})
 
 # drop a collection
 db.tweets.drop()
+
+# do bigger th buffer with responses in shell
+DBQuery.shellBatchSize = 300
+
+# DISTINCT
+db.tweets.distinct("created_at")

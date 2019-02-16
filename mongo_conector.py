@@ -5,16 +5,15 @@ client = MongoClient(MONGO_HOST)
 db = client.twitterdb
 
 def get_tweet_ids_list_from_database():
-    return db.tweets.find( {},{ "id_str": 1, "_id": 0 } )
+    cursor_resultados = db.tweets.find({},{ "id_str": 1, "_id": 0 } )
+    tweets_id_list = [x["id_str"] for x in cursor_resultados]
+    return tweets_id_list
 
 
 def update_many_tweets_dicts_in_mongo(tweets_list):
-    # mycollection.update_one({'_id':mongo_id}, {"$set": post}, upsert=False)
-    # replace
-    pass
-
-# def update_tweets(tweets_ids_list):
-#     API = tweepy.API(auth)
-#     tweets = API.statuses_lookup(tweets_ids_list)
-#     for tweet in tweets:
-#         consumer.update_tweet_dict_in_mongo(tweet["id_str"],tweet)
+    # replaceOne
+    # update_one
+    # db.tweets.update_many(tweets_list) hace falta un filter y un update tal vez se pueda hacer
+    for tweet in tweets_list:
+        tweet_id = tweet["id_str"]
+        db.tweets.replace_one({"_id" : tweet_id },tweet)

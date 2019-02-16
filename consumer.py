@@ -27,7 +27,7 @@ class StreamListener(tweepy.StreamListener):
         self.max_mins = max_mins
         self.max_tweets = max_tweets
         self.start_time = time.time()
-        self.message_timer = Timer(2,self.show_messages_info)
+        self.message_timer = Timer(5,self.show_messages_info)
         self.message_timer.start()
         # self.client = MongoClient(mongo_conector.MONGO_HOST)
         # # Use twitterdb database. If it doesn't exist, it will be created.
@@ -59,7 +59,7 @@ class StreamListener(tweepy.StreamListener):
     def on_data(self, data):
         try:
             # Decode the JSON from Twitter
-            datajson = get_mongo_document(data)
+            datajson = get_mongo_document(data) # controlamos los errores antes de insertarlo
             #insert the data into the mongoDB into a collection called tweets
             #if tweets doesn't exist, it will be created.
             if datajson is not None:
@@ -77,7 +77,7 @@ class StreamListener(tweepy.StreamListener):
 
  
 
-def get_tweets(max_tweets=3000,query="#science",filename="tweets"): 
+def collect_tweets(max_tweets=3000,query="#science",filename="tweets"): 
         API = tweepy.API(auth)
         tweets_list = [status._json for status in tweepy.Cursor(API.search, q=query,count=100,lang="es", since="2017-04-03").items(max_tweets)]
         
@@ -87,7 +87,7 @@ def get_tweets(max_tweets=3000,query="#science",filename="tweets"):
         print("{} tweets capturados".format(len(tweets_list)))
         #dumps -> dump string
 
-def get_tweets_by_streamming(WORDS=[],max_tweets=100,max_mins=2):
+def collect_tweets_by_streamming(WORDS=[],max_tweets=10000,max_mins=2):
     API = tweepy.API(wait_on_rate_limit=True)
     listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins) 
     streamer = tweepy.Stream(auth=auth, listener=listener)
@@ -98,6 +98,58 @@ def get_tweets_by_streamming(WORDS=[],max_tweets=100,max_mins=2):
         streamer.filter(languages=["en","es"],is_async=True)
         #REVISAR
         #streamer.filter(languages=["en","es"],async=True)
+
+def get_specifics_tweets_from_api(tweets_ids_list):
+    start_time = time.time()
+    maximum_tweet_ratio = 100
+    API = tweepy.API(auth)
+
+    deleted_tweets_counter = 0 
+    not_collected_tweets_counter = 0
+    tweets_for_update = len(tweets_ids_list)
+    updated_tweets_count = 0
+
+    i=0
+    while i < tweets_for_update:
+        print("{}/{} ({:.3f}%) tweets updated (with {} faileds)  TIME:{}"
+        .format(updated_tweets_count,tweets_for_update,(updated_tweets_count/tweets_for_update)*100,not_collected_tweets_counter,
+        time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))))
+        try:
+            tweets = API.statuses_lookup(tweets_ids_list[i:i+maximum_tweet_ratio])
+        except Exception as e:
+            print("[LOOKUP-TWEETS-IDS] {}".format(e))
+            exit(1)
+
+        x=0
+        new_version_of_tweets = []
+        while x < len(tweets):
+            
+            tweet_dict = tweets[x]._json
+            if tweet_dict.get('errors',False) != False: 
+                not_collected_tweets_counter += 1
+                if tweet_dict['errors'].get('code',0) == 144:
+                    deleted_tweets_counter +=1
+                print("actualizado erroneo")
+            elif tweet_dict.get('limit',False) != False:
+                not_collected_tweets_counter += 1
+                print("limite alcanzado")
+            else:
+                tweet_dict["_id"] = tweet_dict["id_str"]
+                new_version_of_tweets.append(tweet_dict)
+                updated_tweets_count += 1
+            x+=1
+
+        mongo_conector.update_many_tweets_dicts_in_mongo(new_version_of_tweets)
+        i+=maximum_tweet_ratio
+    
+
+    print("\n\nTweets para actualizar = {}".format(tweets_for_update))
+    print("Tweets actualizados = {}".format(tweets_for_update-not_collected_tweets_counter))
+    print("Tweets no actualizados = {}".format(not_collected_tweets_counter))
+    print("Tweets que ya no están en la base de datos de Twitter = {}".format(deleted_tweets_counter))
+
+
+
 
 def get_mongo_document(json_tweet):
     try:
@@ -115,5 +167,7 @@ if __name__ == '__main__':
     # while True:
     #     get_tweets()
     #     time.sleep(1200) # sleep 20 min
-    get_tweets_by_streamming(["red"])
-    
+
+    #collect_tweets_by_streamming(["red"])
+
+    get_specifics_tweets_from_api(mongo_conector.get_tweet_ids_list_from_database())
