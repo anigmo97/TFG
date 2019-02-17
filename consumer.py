@@ -6,7 +6,7 @@ from pymongo import MongoClient
 import global_variables
 from global_functions import get_utc_time
 import mongo_conector
-from threading import Timer
+from threading import Timer,Thread
 
 now = datetime.datetime.now()
 
@@ -130,9 +130,14 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
         streamer = tweepy.Stream(auth=auth, listener=listener)
         print("Tracking: " + str(WORDS))
         if len(WORDS) > 0:
-            streamer.filter(languages=["en","es"],track=WORDS,is_async=True)
+            #threading.Thread(target=self._thread_function, args=(arg1,),kwargs={'arg2':arg2}, name='thread_function').start()
+            streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],track=WORDS,is_async=True))
         else:
-            streamer.filter(languages=["en","es"],is_async=True)
+            streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],is_async=True))
+        streamming_thread.start()
+        streamming_thread.join()
+        # while streamming_thread.is_alive:
+        #     pass
     except Exception as e:
         print(e)
         #REVISAR

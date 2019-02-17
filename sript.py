@@ -11,6 +11,7 @@ from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict,
 from logger import show_info,show_parameters
 import consumer
 import mongo_conector
+from threading import Thread
 
 
 patron_way_of_send = u"rel(.*)>([\s\S]*?)<(.*)"
@@ -269,6 +270,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     show_parameters(args)
     fileSystemMode = False
+    exist_thread = False
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
@@ -299,10 +301,13 @@ if __name__ == "__main__":
         else:
             if checkParameter(args.update) == 1:
                 throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
-            # thread = Thread(target = consumer.collect_tweets_by_streamming_and_save_in_mongo, args = (10, ))
-            # (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
-            consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
-    # There is no options in [ -f, -d, -dd, -q, -qf, -s]
+            argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+            thread = Thread(target = consumer.collect_tweets_by_streamming_and_save_in_mongo, args = argumentos_funcion)
+            exist_thread = True
+            thread.start()
+            thread.join()
+            # consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+        # There is no options in [ -f, -d, -dd, -q, -qf, -s]
     else:
         if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) >1:
             throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones (-f, -d, -dd, -q, -qf, -s) no se pueden usar las opciones -w -mm -mt")
@@ -310,6 +315,7 @@ if __name__ == "__main__":
             tweets_ids = mongo_conector.get_tweet_ids_list_from_database()
             consumer.get_specifics_tweets_from_api_and_update_mongo(tweets_ids)
         tweets_files_list = mongo_conector.get_tweets_cursor_from_mongo()
+
 
     if fileSystemMode:
         analyze_tweets_from_filesystem(json_files_path_list)
