@@ -29,7 +29,7 @@ class StreamListener(tweepy.StreamListener):
         self.start_time = time.time()
         self.message_timer = Timer(5,self.show_messages_info)
         self.message_timer.start()
-        self.time_timer = Timer(max_mins*10,self.finalize_by_time)
+        self.time_timer = Timer(max_mins*60,self.finalize_by_time)
         self.time_timer.start()
         # self.client = MongoClient(mongo_conector.MONGO_HOST)
         # # Use twitterdb database. If it doesn't exist, it will be created.
@@ -48,15 +48,27 @@ class StreamListener(tweepy.StreamListener):
         self.on_disconnect("Se ha agotado el tiempo maximo especificado por el usuario")
 
     def on_disconnect(self, notice):
+        self.time_timer.cancel()
         self.message_timer.cancel()
         print(notice)
         print("You are now disconnected to the streaming API.\n\n")
+        
 
     def on_error(self, status_code):
         # On error - if an error occurs, display the error / status code
-        print('An Error has occured: ' + repr(status_code))
-        return False
- 
+        print('\n\n[STREAM ERROR]  An Error has occured: ' + repr(status_code))
+        codigo = 0
+        try:
+            codigo= int(status_code)
+            if codigo == 420:
+                print("You have reached your rate limit\n")
+        except Exception as e:
+            pass
+
+    def on_limit(self, track):
+        print(track + "\n")
+        return   
+
     def on_status(self, status):
         """Called when a new status arrives"""
         pass
@@ -69,7 +81,7 @@ class StreamListener(tweepy.StreamListener):
             #if tweets doesn't exist, it will be created.
             if datajson is not None:
                 mongo_conector.db.tweets.insert(datajson) # cambiar por insert many
-                if(self.streamming_tweets > self.max_tweets):
+                if(self.streamming_tweets >= self.max_tweets):
                     print("\n\n{} messages has been collected".format(self.streamming_tweets))
                     self.on_disconnect("User disconnected after get the required amount of tweets")
                     return False # paramos el streamming
@@ -97,6 +109,7 @@ def collect_tweets_by_query_and_save_in_file(max_tweets=3000,query="#science",fi
 
 
 def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",filename="tweets"): 
+        #wait_on_rate_limit = True, wait_on_rate_limit_notify = True
         API = tweepy.API(auth)
         mongo_tweets_list = [] 
         for status in tweepy.Cursor(API.search, q=query,count=100,lang="es", since="2017-04-03").items(max_tweets):
@@ -109,18 +122,22 @@ def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",f
         return  mongo_tweets_list
 
 
-def collect_tweets_by_streamming_and_save_in_mongo(WORDS=[],max_tweets=10000,max_mins=2):
+def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=10000,max_mins=2):
     print("words {}\t max_tweets {} \t max_mins {}".format(WORDS,max_tweets,max_mins))
-    API = tweepy.API(wait_on_rate_limit=True)
-    listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins) 
-    streamer = tweepy.Stream(auth=auth, listener=listener)
-    print("Tracking: " + str(WORDS))
-    if len(WORDS) > 0:
-        streamer.filter(languages=["en","es"],track=WORDS,is_async=True)
-    else:
-        streamer.filter(languages=["en","es"],is_async=True)
+    try:
+        API = tweepy.API(wait_on_rate_limit=True)
+        listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins) 
+        streamer = tweepy.Stream(auth=auth, listener=listener)
+        print("Tracking: " + str(WORDS))
+        if len(WORDS) > 0:
+            streamer.filter(languages=["en","es"],track=WORDS,is_async=True)
+        else:
+            streamer.filter(languages=["en","es"],is_async=True)
+    except Exception as e:
+        print(e)
         #REVISAR
         #streamer.filter(languages=["en","es"],async=True)
+    
 
 def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
     start_time = time.time()

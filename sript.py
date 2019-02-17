@@ -167,78 +167,76 @@ def analyze_tweets_from_filesystem(json_files_paths):
         current_tweet_dict_list = read_json_file(json_file)
         analyze_tweets(current_tweet_dict_list)
 
-def analyze_tweets(json_files):
-    for json_file in json_files:   
-        current_tweet_dict_list = read_json_file(json_file)
-        for current_tweet_dict in current_tweet_dict_list:
-            # tweet info
-            tweet_id = current_tweet_dict["id_str"]
-            # user info
-            user_id = current_tweet_dict["user"]["id_str"]
-            user_name = current_tweet_dict["user"]["name"]
-            user_nickname = current_tweet_dict["user"]["screen_name"]
-            # Check if is retweet or not
-            is_retweet = current_tweet_dict.get("retweeted_status",False)
-            # Quotes info
-            #has_quote = current_tweet_dict.get("is_quote_status",False)
-            has_quote = is_quoted_tweet(current_tweet_dict.get("quoted_status",False))
-            if has_quote:
-                quoted_user_id = current_tweet_dict["quoted_status"]["user"]["id_str"]
-                quoted_user_name = current_tweet_dict["quoted_status"]["user"]["name"]
-                quoted_user_nickname = current_tweet_dict["quoted_status"]["user"]["screen_name"]
-                quoted_tweet_id = current_tweet_dict["quoted_status"]["id_str"]
-                #print(quoted_user_id,quoted_user_name,quoted_user_nickname)
-                #input()
-                global_variables.quotes_dict[quoted_tweet_id] = current_tweet_dict["quoted_status"]
-                add_to_user_dict(quoted_user_id,quoted_user_name,quoted_user_nickname)
-                num_quotes_tweet = increment_dict_counter(global_variables.local_quoted_tweets_counter,quoted_tweet_id)
-                update_top_10_list(global_variables.local_most_quoted_tweets,(quoted_tweet_id,num_quotes_tweet))
+def analyze_tweets(current_tweet_dict_list):
+    for current_tweet_dict in current_tweet_dict_list:
+        # tweet info
+        tweet_id = current_tweet_dict["id_str"]
+        # user info
+        user_id = current_tweet_dict["user"]["id_str"]
+        user_name = current_tweet_dict["user"]["name"]
+        user_nickname = current_tweet_dict["user"]["screen_name"]
+        # Check if is retweet or not
+        is_retweet = current_tweet_dict.get("retweeted_status",False)
+        # Quotes info
+        #has_quote = current_tweet_dict.get("is_quote_status",False)
+        has_quote = is_quoted_tweet(current_tweet_dict.get("quoted_status",False))
+        if has_quote:
+            quoted_user_id = current_tweet_dict["quoted_status"]["user"]["id_str"]
+            quoted_user_name = current_tweet_dict["quoted_status"]["user"]["name"]
+            quoted_user_nickname = current_tweet_dict["quoted_status"]["user"]["screen_name"]
+            quoted_tweet_id = current_tweet_dict["quoted_status"]["id_str"]
+            #print(quoted_user_id,quoted_user_name,quoted_user_nickname)
+            #input()
+            global_variables.quotes_dict[quoted_tweet_id] = current_tweet_dict["quoted_status"]
+            add_to_user_dict(quoted_user_id,quoted_user_name,quoted_user_nickname)
+            num_quotes_tweet = increment_dict_counter(global_variables.local_quoted_tweets_counter,quoted_tweet_id)
+            update_top_10_list(global_variables.local_most_quoted_tweets,(quoted_tweet_id,num_quotes_tweet))
 
-                num_quotes_user = increment_dict_counter(global_variables.local_quoted_users_counter,quoted_user_id)
-                update_top_10_list(global_variables.local_most_quoted_users,(quoted_user_id,num_quotes_user)) 
+            num_quotes_user = increment_dict_counter(global_variables.local_quoted_users_counter,quoted_user_id)
+            update_top_10_list(global_variables.local_most_quoted_users,(quoted_user_id,num_quotes_user)) 
                 
                 
-            quoted_tweet_id = current_tweet_dict.get("quoted_status_id_str",False)
-            # Replies info
-            replied_tweet_id = current_tweet_dict.get("in_reply_to_status_id_str",False) # it's the way to known if is a reply
-            replied_user_id = current_tweet_dict.get("in_reply_to_user_id_str",False)
-            replied_user_nickname = current_tweet_dict.get("in_reply_to_screen_name",False)
+        quoted_tweet_id = current_tweet_dict.get("quoted_status_id_str",False)
+        # Replies info
+        replied_tweet_id = current_tweet_dict.get("in_reply_to_status_id_str",False) # it's the way to known if is a reply
+        replied_user_id = current_tweet_dict.get("in_reply_to_user_id_str",False)
+        replied_user_nickname = current_tweet_dict.get("in_reply_to_screen_name",False)
 
-            # We add user info to our user_dict 
-            # key = user_id
-            # value = dictionary with two keys 'names' and 'screen-names' that have a list of names as value
-            add_to_user_dict(user_id,user_name,user_nickname)
+        # We add user info to our user_dict 
+        # key = user_id
+        # value = dictionary with two keys 'names' and 'screen-names' that have a list of names as value
+        add_to_user_dict(user_id,user_name,user_nickname)
             
-            # We add the current tweet to our tweet dictionary in order to have inmediate access
-            # key = tweet_id
-            # value = json_dict
-            global_variables.tweets_dict[tweet_id] = current_tweet_dict
+        # We add the current tweet to our tweet dictionary in order to have inmediate access
+        # key = tweet_id
+        # value = json_dict
+        global_variables.tweets_dict[tweet_id] = current_tweet_dict
 
-            # check if this tweet is send by a verified user and compute its stadistics
-            check_if_is_verified(user_id,current_tweet_dict['user']["verified"],is_retweet)
+        # check if this tweet is send by a verified user and compute its stadistics
+        check_if_is_verified(user_id,current_tweet_dict['user']["verified"],is_retweet)
 
-            #check_polarity(tweet_dict[])
-            check_way_of_send(current_tweet_dict["source"])
+        #check_polarity(tweet_dict[])
+        check_way_of_send(current_tweet_dict["source"])
 
             
-            # we update our lists every time to keep the ten best scores
-            update_top_10_list(global_variables.global_most_favs_tweets,(tweet_id,current_tweet_dict.get("favorite_count",0)))
-            update_top_10_list(global_variables.global_most_rt_tweets,(tweet_id,current_tweet_dict["retweet_count"]))
+        # we update our lists every time to keep the ten best scores
+        update_top_10_list(global_variables.global_most_favs_tweets,(tweet_id,current_tweet_dict.get("favorite_count",0)))
+        update_top_10_list(global_variables.global_most_rt_tweets,(tweet_id,current_tweet_dict["retweet_count"]))
 
-            update_top_10_list(global_variables.global_most_favs_users,(user_id,current_tweet_dict["user"]["favourites_count"]))
-            update_top_10_list(global_variables.global_most_tweets_users,(user_id,current_tweet_dict["user"]["statuses_count"]))
-            update_top_10_list(global_variables.global_most_followers_users,(user_id,current_tweet_dict["user"]["followers_count"]))
+        update_top_10_list(global_variables.global_most_favs_users,(user_id,current_tweet_dict["user"]["favourites_count"]))
+        update_top_10_list(global_variables.global_most_tweets_users,(user_id,current_tweet_dict["user"]["statuses_count"]))
+        update_top_10_list(global_variables.global_most_followers_users,(user_id,current_tweet_dict["user"]["followers_count"]))
             
 
-            global_variables.messages_count +=1
+        global_variables.messages_count +=1
             
-            check_if_is_retweet(tweet_id,is_retweet,user_id)
-            check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,replied_tweet_id,replied_user_id,replied_user_nickname)
+        check_if_is_retweet(tweet_id,is_retweet,user_id)
+        check_if_is_reply_or_has_quotes(tweet_id,is_retweet,user_id,has_quote,replied_tweet_id,replied_user_id,replied_user_nickname)
 
-            fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
-            insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)
+        fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
+        insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)
 
-    show_info()
+    show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
     print('\n\nMensajes analizados: {} Time: {}'.format(global_variables.messages_count,timeit.default_timer() - start))
 
@@ -270,35 +268,40 @@ if __name__ == "__main__":
     parser.add_argument("-e","-E","--examples",action='store_true')
     args = parser.parse_args()
     show_parameters(args)
-    file_mode = True
+    fileSystemMode = False
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
     elif checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
         if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) >0:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
-        tweets_files_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
+        json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
+        fileSystemMode = True
     # There is no filesystem options so we are going to check -s -q -qf options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' o -qf de forma simultanea ")
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) == 1:
         if checkParameter(args.query):
-            if checkParameter(args.words) + checkParameter(args.max_time) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) > 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt o -up")
             else:
                 args.query="#"+args.query
                 tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(args.max_messages or 3000,args.query_file or "#python")
                 #leer los tweets de mongo
         elif checkParameter(args.query_file):
-            if checkParameter(args.words) + checkParameter(args.max_time) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt")
+            if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) > 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w -mt o -up")
             else:
                 create_dir_if_not_exits("tweets")
                 args.query_file="#{}".format(args.query_file)
                 tweets_files_list = consumer.collect_tweets_by_query_and_save_in_file(args.max_messages or 3000,args.query_file or "#python")
                 # leer los tweets 
         else:
-            consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or [], args.max_messages or 10000, args.max_time or 10)
+            if checkParameter(args.update) == 1:
+                throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
+            # thread = Thread(target = consumer.collect_tweets_by_streamming_and_save_in_mongo, args = (10, ))
+            # (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+            consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
     # There is no options in [ -f, -d, -dd, -q, -qf, -s]
     else:
         if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) >1:
@@ -308,4 +311,7 @@ if __name__ == "__main__":
             consumer.get_specifics_tweets_from_api_and_update_mongo(tweets_ids)
         tweets_files_list = mongo_conector.get_tweets_cursor_from_mongo()
 
-    analyze_tweets(tweets_files_list)
+    if fileSystemMode:
+        analyze_tweets_from_filesystem(json_files_path_list)
+    else:
+        analyze_tweets(tweets_files_list)
