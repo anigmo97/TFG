@@ -122,7 +122,7 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=[],max_tweets=10000,max
         #REVISAR
         #streamer.filter(languages=["en","es"],async=True)
 
-def get_specifics_tweets_from_api(tweets_ids_list):
+def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
     start_time = time.time()
     maximum_tweet_ratio = 100
     API = tweepy.API(auth)
@@ -193,4 +193,4 @@ if __name__ == '__main__':
 
     #collect_tweets_by_streamming_and_save_in_mongo(["red"])
 
-    get_specifics_tweets_from_api(mongo_conector.get_tweet_ids_list_from_database())
+    get_specifics_tweets_from_api_and_update_mongo(mongo_conector.get_tweet_ids_list_from_database())

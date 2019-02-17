@@ -9,6 +9,9 @@ def get_tweet_ids_list_from_database():
     tweets_id_list = [x["id_str"] for x in cursor_resultados]
     return tweets_id_list
 
+def get_tweets_cursor_from_mongo():
+    return db.tweets.find({})
+
 
 def update_many_tweets_dicts_in_mongo(tweets_list):
     # replaceOne

@@ -10,6 +10,7 @@ from global_functions import update_top_10_list,throw_error,notNone,checkParamet
 from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict,create_dir_if_not_exits
 from logger import show_info,show_parameters
 import consumer
+import mongo_conector
 
 
 patron_way_of_send = u"rel(.*)>([\s\S]*?)<(.*)"
@@ -161,10 +162,13 @@ def check_if_is_retweet(tweet_id,retweeted,user_id):
 
         
 
-
+def analyze_tweets_from_filesystem(json_files_paths):
+    for json_file in json_files_paths:
+        current_tweet_dict_list = read_json_file(json_file)
+        analyze_tweets(current_tweet_dict_list)
 
 def analyze_tweets(json_files):
-    for json_file in json_files:
+    for json_file in json_files:   
         current_tweet_dict_list = read_json_file(json_file)
         for current_tweet_dict in current_tweet_dict_list:
             # tweet info
@@ -239,6 +243,7 @@ def analyze_tweets(json_files):
     print('\n\nMensajes analizados: {} Time: {}'.format(global_variables.messages_count,timeit.default_timer() - start))
 
 
+
 ######################################################################
 ######################       MAIN PROGRAM       ######################
 ######################################################################
@@ -266,12 +271,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     show_parameters(args)
     file_mode = True
+    # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
     elif checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
         if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) >0:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
         tweets_files_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
+    # There is no filesystem options so we are going to check -s -q -qf options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' o -qf de forma simultanea ")
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) == 1:
@@ -292,7 +299,13 @@ if __name__ == "__main__":
                 # leer los tweets 
         else:
             consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or [], args.max_messages or 10000, args.max_time or 10)
+    # There is no options in [ -f, -d, -dd, -q, -qf, -s]
     else:
-        throw_error(sys.modules[__name__],"Se debe usar al menos una opcion de las siguientes: -f -d -dd (toman mensajes del sistema de archivos )\n o -d -q -qf (toman mensajes del api y despues los analizan) ")
+        if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) >1:
+            throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones (-f, -d, -dd, -q, -qf, -s) no se pueden usar las opciones -w -mm -mt")
+        if checkParameter(args.update):
+            tweets_ids = mongo_conector.get_tweet_ids_list_from_database()
+            consumer.get_specifics_tweets_from_api_and_update_mongo(tweets_ids)
+        tweets_files_list = mongo_conector.get_tweets_cursor_from_mongo()
 
     analyze_tweets(tweets_files_list)
