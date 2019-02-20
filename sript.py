@@ -237,7 +237,7 @@ def analyze_tweets(current_tweet_dict_list):
         fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
         insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)
 
-    show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
+    #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
     print('\n\nMensajes analizados: {} Time: {}'.format(global_variables.messages_count,timeit.default_timer() - start))
 
@@ -266,16 +266,20 @@ if __name__ == "__main__":
     parser.add_argument("-mm","-MM","--max_messages",help="specify maximum num of messages to collect",type=int)
     parser.add_argument("-mt","-MT","--max_time",help="specify maximum time of collecting in minutes.This option has to be used in streamming",type=int)
 
+    parser.add_argument("-c","-C","--collection",help="MongoDB collection to use",type=str)
+
     parser.add_argument("-e","-E","--examples",action='store_true')
     args = parser.parse_args()
     show_parameters(args)
     fileSystemMode = False
     exist_thread = False
+    mongo_conector.current_collection = (args.collection or "tweets")
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
     elif checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
-        if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) >0:
+        if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
+        + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) + checkParameter(args.collection)>0:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
         json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
         fileSystemMode = True
@@ -283,14 +287,14 @@ if __name__ == "__main__":
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' o -qf de forma simultanea ")
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) == 1:
-        if checkParameter(args.query):
+        if checkParameter(args.query): # -q option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) > 0:
                 throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt o -up")
             else:
                 args.query="#"+args.query
                 tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(args.max_messages or 3000,args.query_file or "#python")
                 #leer los tweets de mongo
-        elif checkParameter(args.query_file):
+        elif checkParameter(args.query_file): # -qf option
             if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) > 0:
                 throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w -mt o -up")
             else:
@@ -298,7 +302,7 @@ if __name__ == "__main__":
                 args.query_file="#{}".format(args.query_file)
                 tweets_files_list = consumer.collect_tweets_by_query_and_save_in_file(args.max_messages or 3000,args.query_file or "#python")
                 # leer los tweets 
-        else:
+        else: # -s option
             if checkParameter(args.update) == 1:
                 throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
             argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)

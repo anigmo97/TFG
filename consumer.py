@@ -80,7 +80,7 @@ class StreamListener(tweepy.StreamListener):
             #insert the data into the mongoDB into a collection called tweets
             #if tweets doesn't exist, it will be created.
             if datajson is not None:
-                mongo_conector.db.tweets.insert(datajson) # cambiar por insert many
+                mongo_conector.db[mongo_conector.current_collection].insert(datajson) # cambiar por insert many
                 if(self.streamming_tweets >= self.max_tweets):
                     print("\n\n{} messages has been collected".format(self.streamming_tweets))
                     self.on_disconnect("User disconnected after get the required amount of tweets")
@@ -111,15 +111,18 @@ def collect_tweets_by_query_and_save_in_file(max_tweets=3000,query="#science",fi
 def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",filename="tweets"): 
         #wait_on_rate_limit = True, wait_on_rate_limit_notify = True
         API = tweepy.API(auth)
-        mongo_tweets_list = [] 
+        mongo_tweets_dict = {}
+        mongo_tweets_id_list = [] 
         for status in tweepy.Cursor(API.search, q=query,count=100,lang="es", since="2017-04-03").items(max_tweets):
             tweet = status._json
             if(tweet.get("id_str",False) != False):
-                tweet["_id"]= tweet["id_str"]
-                mongo_tweets_list.append(tweet)
-        mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_list)
-        print("{} tweets capturados".format(len(mongo_tweets_list)))
-        return  mongo_tweets_list
+                tweet_id = tweet["id_str"]
+                tweet["_id"]= tweet_id
+                mongo_tweets_id_list.append(tweet_id)
+                mongo_tweets_dict[tweet_id] = tweet
+        mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
+        print("{} tweets capturados".format(len(mongo_tweets_id_list)))
+        return  mongo_tweets_dict.values()
 
 
 def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=10000,max_mins=2):
@@ -136,8 +139,8 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
             streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],is_async=True))
         streamming_thread.start()
         streamming_thread.join()
-        # while streamming_thread.is_alive:
-        #     pass
+        while streamming_thread.is_alive: #echo para sincronizar
+            pass
     except Exception as e:
         print(e)
         #REVISAR
@@ -184,7 +187,7 @@ def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
                 updated_tweets_count += 1
             x+=1
 
-        mongo_conector.update_many_tweets_dicts_in_mongo(new_version_of_tweets)
+        mongo_conector.update_many_tweets_dicts_in_mongo(new_version_of_tweets,mongo_conector.current_collection)
         i+=maximum_tweet_ratio
     
 
@@ -215,4 +218,4 @@ if __name__ == '__main__':
 
     #collect_tweets_by_streamming_and_save_in_mongo(["red"])
 
-    get_specifics_tweets_from_api_and_update_mongo(mongo_conector.get_tweet_ids_list_from_database())
+    get_specifics_tweets_from_api_and_update_mongo(mongo_conector.get_tweet_ids_list_from_database(default_collection))

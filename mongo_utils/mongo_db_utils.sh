@@ -37,3 +37,5 @@ ps -A  | grep chrome | cut -d ' ' -f1 | grep -E '..*'
 sudo lsof -i -P -n | grep LISTEN | grep mongo
 
 netstat -plntu
+
+db.[CollectionName].find().forEach(function(d){ db.getSiblingDB([Database])[CollectionName].insert(d); });
