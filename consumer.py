@@ -7,6 +7,7 @@ import global_variables
 from global_functions import get_utc_time
 import mongo_conector
 from threading import Timer,Thread
+from sript import analyze_tweets
 
 now = datetime.datetime.now()
 
@@ -31,6 +32,10 @@ class StreamListener(tweepy.StreamListener):
         self.message_timer.start()
         self.time_timer = Timer(max_mins*60,self.finalize_by_time)
         self.time_timer.start()
+        self.mongo_tweets_dict = {}
+        self.mongo_tweets_ids_list = []
+        self.tweets_no_repetidos = []
+        self.trunk= min(500,max_tweets)
         # self.client = MongoClient(mongo_conector.MONGO_HOST)
         # # Use twitterdb database. If it doesn't exist, it will be created.
         # self.db = self.client.twitterdb
@@ -50,8 +55,13 @@ class StreamListener(tweepy.StreamListener):
     def on_disconnect(self, notice):
         self.time_timer.cancel()
         self.message_timer.cancel()
-        print(notice)
-        print("You are now disconnected to the streaming API.\n\n")
+        print("[ON DISCONNECT INFO] {}".format(notice))
+        print("[ON DISCONNECT INFO] You are now disconnected to the streaming API.\n\n")
+        if len (self.mongo_tweets_ids_list)>0:
+            analyze_tweets(self.mongo_tweets_dict.values())
+            mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
+            mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+            print("FINISH")
         
 
     def on_error(self, status_code):
@@ -75,19 +85,30 @@ class StreamListener(tweepy.StreamListener):
 
     def on_data(self, data):
         try:
+            # if "start" in data:
+            #     print(data)
             # Decode the JSON from Twitter
             datajson = get_mongo_document(data) # controlamos los errores antes de insertarlo
-            #insert the data into the mongoDB into a collection called tweets
-            #if tweets doesn't exist, it will be created.
             if datajson is not None:
-                mongo_conector.db[mongo_conector.current_collection].insert(datajson) # cambiar por insert many
+                #analizar tweet
+                self.mongo_tweets_dict[datajson["_id"]] = datajson
+                self.mongo_tweets_ids_list.append(datajson["_id"])
+                if len(self.mongo_tweets_ids_list) > self.trunk:
+                    print("[ON DATA INFO] {} messages are going to be inserted in mongo".format(len(self.mongo_tweets_ids_list)))
+                    self.tweets_no_repetidos = mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
+                    print("[ON DATA INFO] {} messages are going to be analyzed".format(len(self.tweets_no_repetidos)))
+                    analyze_tweets(self.tweets_no_repetidos)
+                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                    self.mongo_tweets_dict = {}
+                    self.mongo_tweets_ids_list = []
                 if(self.streamming_tweets >= self.max_tweets):
                     print("\n\n{} messages has been collected".format(self.streamming_tweets))
                     self.on_disconnect("User disconnected after get the required amount of tweets")
                     return False # paramos el streamming
                 self.streamming_tweets += 1
         except Exception as e:
-           print("[ON DATA] {} {}".format(e,e.__cause__))
+            pass
+            #print("[ON DATA ERROR] {} {}".format(e,e.__cause__))
         
 
 
@@ -95,6 +116,7 @@ class StreamListener(tweepy.StreamListener):
  
 
 def collect_tweets_by_query_and_save_in_file(max_tweets=3000,query="#science",filename="tweets"): 
+        print("[ QUERY TO FILE INFO ] Collectings tweets by query = '{}'".format(query))
         API = tweepy.API(auth)
         cursor_respuestas = tweepy.Cursor(API.search, q=query,count=1000,lang="es", since="2017-04-03").items(max_tweets)
         tweets_list = [status._json for status in cursor_respuestas]
@@ -109,6 +131,7 @@ def collect_tweets_by_query_and_save_in_file(max_tweets=3000,query="#science",fi
 
 
 def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",filename="tweets"): 
+        print("[ QUERY TO MONGO INFO ] Collectings tweets by query = '{}'".format(query))
         #wait_on_rate_limit = True, wait_on_rate_limit_notify = True
         API = tweepy.API(auth)
         mongo_tweets_dict = {}
@@ -120,12 +143,13 @@ def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",f
                 tweet["_id"]= tweet_id
                 mongo_tweets_id_list.append(tweet_id)
                 mongo_tweets_dict[tweet_id] = tweet
-        mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
         print("{} tweets capturados".format(len(mongo_tweets_id_list)))
-        return  mongo_tweets_dict.values()
+        tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
+        return  tweets_sin_repetir
 
 
 def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=10000,max_mins=2):
+    print("[ STREAMMING TO MONGO INFO ] Starting API")
     print("words {}\t max_tweets {} \t max_mins {}".format(WORDS,max_tweets,max_mins))
     try:
         API = tweepy.API(wait_on_rate_limit=True)
@@ -134,13 +158,15 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
         print("Tracking: " + str(WORDS))
         if len(WORDS) > 0:
             #threading.Thread(target=self._thread_function, args=(arg1,),kwargs={'arg2':arg2}, name='thread_function').start()
-            streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],track=WORDS,is_async=True))
+            #streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],track=WORDS,is_async=True))
+            streamer.filter(languages=["en","es"],track=WORDS,is_async=True)
         else:
-            streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],is_async=True))
-        streamming_thread.start()
-        streamming_thread.join()
-        while streamming_thread.is_alive: #echo para sincronizar
-            pass
+            #streamming_thread = Thread(target=streamer.filter,kwargs=dict(languages=["en","es"],is_async=True))
+            streamer.filter(languages=["en","es"],is_async=True)
+        #streamming_thread.start()
+        #streamming_thread.join()
+        #while streamming_thread.is_alive: #echo para sincronizar
+            #pass
     except Exception as e:
         print(e)
         #REVISAR
@@ -205,7 +231,7 @@ def get_mongo_document(json_tweet):
         tweet_id = tweet_dict["id_str"]
         tweet_dict["_id"]= tweet_id
     except Exception:
-        print(json.dumps(tweet_dict,indent=4, sort_keys=True))
+        print("[GET MONGO DOCUMENT ERROR] {} ".format(json.dumps(tweet_dict,indent=4, sort_keys=True)))
         return None
     return tweet_dict
 
@@ -218,4 +244,4 @@ if __name__ == '__main__':
 
     #collect_tweets_by_streamming_and_save_in_mongo(["red"])
 
-    get_specifics_tweets_from_api_and_update_mongo(mongo_conector.get_tweet_ids_list_from_database(default_collection))
+    pass

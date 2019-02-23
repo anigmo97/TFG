@@ -31,7 +31,7 @@ def update_top_10_list(lista,tuple_id_amount,show=False):
         amount = max(lista[i][1],amount)
         del lista[i]
         borrar = False
-    while i >= 1 and lista[i-1][global_variables.AMOUNT] < amount:
+    while i >= 1 and (lista[i-1][global_variables.AMOUNT] < amount or lista[i-1][global_variables.ID]==0):
         i-=1
     lista.insert(i,(id,amount))
     if borrar:
@@ -117,12 +117,40 @@ def is_tweet(id):
     elif id in global_variables.tweets_dict:
         return True
     else:
-        return None    
+        return None
 
-def load_statistics_file_in_global_variables(statistics_file):
-    if not (type(statistics_file) is dict):
-        raise Exception('[LOAD STATISTICS ERROR] Statistics_file debe ser un diccionario')
-    set(globals(global_variables)).issubset(statistics_file.keys())
+def replace_bullet_with_dot(word):
+    return word.replace('•','.')
+
+def replace_dot_with_bullet(word):
+    return word.replace('.','•')  
+    #cadena_unicode = u"prueba•prueba".encode("utf-8")
+    #cadena_utf = cadena_unicode.decode("utf-8")
+    #print(cadena_unicode)
+    #print(cadena_utf)
+#    u'•' == u'\u2022'  
+
+def change_dot_in_keys_for_bullet(dicctionary):
+    new_dict = {}
+    for k,v in dicctionary.items():
+        if "." in k:
+            print("[CHANGE DOT FOR BULLET INFO] Changing '.' in key {} for '•'".format(k))
+            new_key = replace_dot_with_bullet(k)
+            new_dict[new_key] = v
+        else:
+            new_dict[k] = v
+    return new_dict
+
+def change_bullet_in_keys_for_dot(dicctionary):
+    new_dict = {}
+    for k,v in dicctionary.items():
+        if "•" in k:
+            print("[CHANGE BULLET FOR DOT INFO] Changing '•' in key {} for '.'".format(k))
+            new_key = replace_bullet_with_dot(k)
+            new_dict[new_key] = v
+        else:
+            new_dict[k] = v
+    return new_dict
 
 ###################################################################################################################################
 ###################################################################################################################################
@@ -205,5 +233,4 @@ def print_all_top_ten_lists():
     #print_top_10_list(global_variables.local_most_favs_users,"")
     #print_top_10_list(global_variables.local_most_followers_users,"usuarios de los cuales tenemos mas followers")
 
-x= global_variables.get_statistics_dict()
-print(x)
+

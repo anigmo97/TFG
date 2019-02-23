@@ -84,7 +84,7 @@ local_most_quoted_tweets = create_top_ten_list()
 
 def check_variable_conditions(k,v):
 	# si no s una variable protegida no es tmp (tmp es local) y no es especial
-	key_conditions = not k.startswith('_') and k!='tmp' and k!='In' and k!='Out' and k!="ID" and k!="AMOUNT"
+	key_conditions = not k.startswith('_') and k not in ["tmp","In","Out","ID","AMOUNT"] and not "dict" in k
 	# si no es una funcion
 	value_condition = not hasattr(v, '__call__')
 	return  key_conditions and value_condition
@@ -102,6 +102,7 @@ def get_statistics_dict():
 	return { k : v for k,v in tmp.items() if check_variable_conditions(k,v)}
 
 def set_statistics_from_statistics_dict(statistics_dict):
+	print("[SET STATISTICS FROM FILE INFO] LOADING STATISTICS INTO VARIABLES")
 	variable_names_set = set(get_user_variables_names())
 	statistic_keys_set = set(statistics_dict.keys())
 	if not variable_names_set.issubset(statistic_keys_set):
@@ -111,7 +112,12 @@ def set_statistics_from_statistics_dict(statistics_dict):
 			exit(1)
 	
 	for k,v in statistics_dict.items():
-		set_variable_value(k,v)
+		if k in statistic_keys_set:
+			set_variable_value(k,v)
+		else:
+			print("[SET STATISTICS DICT INFO ] The variable {} hasn't been set because it isn't in the user variables ".format(k))
+	
+	print("[SET STATISTICS FROM FILE INFO] STATISTICS HAS BEEN SUCESSFULLY LOADED INTO VARIABLES")
 
 def set_variable_value(variable_string_name,value):
 	try:

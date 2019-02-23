@@ -161,7 +161,13 @@ def check_if_is_retweet(tweet_id,retweeted,user_id):
     num_messages = increment_dict_counter(global_variables.local_user_messages_counter,user_id)
     update_top_10_list(global_variables.local_most_messages_users,(user_id,num_messages))
 
-        
+def recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,collection):
+    if recalculate_statistics:
+        print("[ RECALCULATE STATISTICS INFO] Starting collection messages analysis")
+        tweets_list = mongo_conector.get_tweets_cursor_from_mongo(collection)
+        analyze_tweets(tweets_list)
+        print("[ RECALCULATE STATISTICS INFO] Messages analyzed sucessfully")
+        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),collection)
 
 def analyze_tweets_from_filesystem(json_files_paths):
     for json_file in json_files_paths:
@@ -169,9 +175,21 @@ def analyze_tweets_from_filesystem(json_files_paths):
         analyze_tweets(current_tweet_dict_list)
 
 def analyze_tweets(current_tweet_dict_list):
+    print("[ANALYZE TWEETS INFO] Starting analysis...")
+    tweets_ids_set = set()
+    insertions_in_set = 0
+
+
+    start = timeit.default_timer()
     for current_tweet_dict in current_tweet_dict_list:
+
         # tweet info
         tweet_id = current_tweet_dict["id_str"]
+
+        #check duplicates
+        tweets_ids_set.add(tweet_id)
+        insertions_in_set +=1
+
         # user info
         user_id = current_tweet_dict["user"]["id_str"]
         user_name = current_tweet_dict["user"]["name"]
@@ -222,6 +240,8 @@ def analyze_tweets(current_tweet_dict_list):
             
         # we update our lists every time to keep the ten best scores
         update_top_10_list(global_variables.global_most_favs_tweets,(tweet_id,current_tweet_dict.get("favorite_count",0)))
+        [print(x) for x in global_variables.global_most_favs_tweets]
+        input()
         update_top_10_list(global_variables.global_most_rt_tweets,(tweet_id,current_tweet_dict["retweet_count"]))
 
         update_top_10_list(global_variables.global_most_favs_users,(user_id,current_tweet_dict["user"]["favourites_count"]))
@@ -237,15 +257,19 @@ def analyze_tweets(current_tweet_dict_list):
         fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
         insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)
 
-    #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
+        if len(tweets_ids_set) < insertions_in_set:
+            print("[ANALYZE_TWEETS WARN] There are duplicates in the messages analyzed")
+            input() 
+
+    show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
     print('\n\nMensajes analizados: {} Time: {}'.format(global_variables.messages_count,timeit.default_timer() - start))
 
 
 
-######################################################################
-######################       MAIN PROGRAM       ######################
-######################################################################
+#############################################################################################################################
+######################       MAIN PROGRAM       #############################################################################
+#############################################################################################################################
 if __name__ == "__main__":
     start = timeit.default_timer()
 
@@ -273,8 +297,13 @@ if __name__ == "__main__":
     show_parameters(args)
     fileSystemMode = False
     exist_thread = False
+    recalculate_statistics = False
     mongo_conector.current_collection = (args.collection or "tweets")
 
+
+###################################################################################################################################################
+###################################################################### CHECK ERRORS ###############################################################
+###################################################################################################################################################
 
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
@@ -283,10 +312,6 @@ if __name__ == "__main__":
         if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
         + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) + checkParameter(args.collection)>0:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
-        json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
-        fileSystemMode = True
-
-
     # There is no filesystem options so we are going to check -s -q -qf options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' o -qf de forma simultanea ")
@@ -294,42 +319,70 @@ if __name__ == "__main__":
         if checkParameter(args.query): # -q option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) > 0:
                 throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w o -mt o -up")
-            else:
-                args.query="#"+args.query
-                tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(args.max_messages or 3000,args.query_file or "#python")
-                #leer los tweets de mongo
         elif checkParameter(args.query_file): # -qf option
             if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) > 0:
                 throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w -mt o -up")
-            else:
-                create_dir_if_not_exits("tweets")
-                args.query_file="#{}".format(args.query_file)
-                tweets_files_list = consumer.collect_tweets_by_query_and_save_in_file(args.max_messages or 3000,args.query_file or "#python")
-                # leer los tweets 
         else: # -s option
             if checkParameter(args.update) == 1:
                 throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
-            argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
-            thread = Thread(target = consumer.collect_tweets_by_streamming_and_save_in_mongo, args = argumentos_funcion)
-            exist_thread = True
-            thread.start()
-            thread.join()
-            # consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
-        
-        
-        
-        
-        # There is no options in [ -f, -d, -dd, -q, -qf, -s]
     else:
         if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) >1:
             throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones (-f, -d, -dd, -q, -qf, -s) no se pueden usar las opciones -w -mm -mt")
-        if checkParameter(args.update):
-            tweets_ids = mongo_conector.get_tweet_ids_list_from_database()
-            consumer.get_specifics_tweets_from_api_and_update_mongo(tweets_ids)
-        tweets_files_list = mongo_conector.get_tweets_cursor_from_mongo()
+
+###################################################################################################################################################
+###################################################################### FIN CHECK ERRORS ###########################################################
+###################################################################################################################################################
+    
+    print("\n\n[ MAIN INFO ] There is no errors in the command options ")
+
+    # We control filesystem options
+    if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
+        json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
+        fileSystemMode = True
+    else:
+        if checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
+            print("[ MAIN INFO ] The working collection is {}".format(mongo_conector.current_collection))
+            statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
+            if statistics_file == None:
+                if mongo_conector.get_count_of_a_collection(mongo_conector.current_collection) > 0:
+                    print("[MAIN INFO] No hay fichero de estadísticas para la colección {} pero la coleccion tiene registros por lo que se generará uno analizando en primer lugar los tweets de la coleccion".format(mongo_conector.current_collection))
+                    recalculate_statistics = True
+                else:
+                    print("[MAIN INFO] No hay fichero de estadísticas para la colección {} y la coleccion no tiene datos, se generará un fichero nuevo con los nuevos mensajes que se recopilen".format(mongo_conector.current_collection))
+                    recalculate_statistics = False
+            else:
+                global_variables.set_statistics_from_statistics_dict(statistics_file)
+    
+        if checkParameter(args.query): # -q option
+            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
+            args.query="#"+args.query
+            tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(args.max_messages or 3000,args.query or "#python")
+        elif checkParameter(args.query_file): # -qf option
+            create_dir_if_not_exits("tweets")
+            args.query_file="#{}".format(args.query_file)
+            tweets_files_list = consumer.collect_tweets_by_query_and_save_in_file(args.max_messages or 3000,args.query_file or "#python")
+        elif checkParameter(args.streamming):
+            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
+            argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+            consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+            # thread = Thread(target = consumer.collect_tweets_by_streamming_and_save_in_mongo, args = argumentos_funcion)
+            # exist_thread = True
+            # thread.start()
+            # thread.join()
+            # consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+        # There is no options in [ -f, -d, -dd, -q, -qf, -s]
+        else:
+            if checkParameter(args.update):
+                tweets_ids = mongo_conector.get_tweet_ids_list_from_database(mongo_conector.current_collection)
+                consumer.get_specifics_tweets_from_api_and_update_mongo(tweets_ids)
+                # si no hay fichero no hago nada pero si hay tengo k ir actualizando las estadisticas de los tweets analizados
+            tweets_files_list = mongo_conector.get_tweets_cursor_from_mongo(mongo_conector.current_collection)
+
 
 
     if fileSystemMode:
         analyze_tweets_from_filesystem(json_files_path_list)
     else:
-        analyze_tweets(tweets_files_list)
+        if not checkParameter(args.streamming): # streamming los analiza e inserta sobre la marcha
+            analyze_tweets(tweets_files_list)
+            mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
