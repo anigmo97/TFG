@@ -1,8 +1,10 @@
-from global_functions import create_top_ten_list
+def create_top_ten_list():
+    return [(0,0)] * 10
+	
 # GLOBAL VARIABLES
 ID = 0
 AMOUNT = 1
-count=0
+#count=0
 
 
 messages_count = 0
@@ -59,7 +61,7 @@ global_most_followers_users = create_top_ten_list()
 local_user_messages_counter = {} # dict [user] -> num_mensajes_analizados
 local_user_tweets_counter = {} # dict [user] -> num_tweets_analizados
 local_user_retweets_counter = {} # dict [user] -> num_retweets_analizados
-local_followers_counter = {} #INVESTIGATE HOW TO GET FOLLOWERS LIST
+#local_followers_counter = {} #INVESTIGATE HOW TO GET FOLLOWERS LIST
 local_replied_users_counter = {} # dict [user] -> num_tweets que tenemos que le responden
 local_replied_tweets_couter = {} # dict [tweet_id] -> num_respuestas que nosotros tenemos
 
@@ -71,12 +73,39 @@ local_most_messages_users = create_top_ten_list()
 local_most_tweets_users = create_top_ten_list()
 local_most_retweets_users = create_top_ten_list()
 
-local_most_favs_users = create_top_ten_list() #INVESTIGATE HOW TO GET WHO'S LIKE A TWEET
-local_most_followers_users = create_top_ten_list() #INVESTIGATE HOW TO GET FOLLOWERS LIST
+#local_most_favs_users = create_top_ten_list() #INVESTIGATE HOW TO GET WHO'S LIKE A TWEET
+#local_most_followers_users = create_top_ten_list() #INVESTIGATE HOW TO GET FOLLOWERS LIST
 
 local_most_replied_users = create_top_ten_list()
 local_most_replied_tweets = create_top_ten_list()
 
 local_most_quoted_users = create_top_ten_list()
 local_most_quoted_tweets = create_top_ten_list()
+
+def get_user_variables_names():
+	def check_condition(k,v):
+		# si no s una variable protegida no es tmp (tmp es local) y no es especial
+		key_conditions = not k.startswith('_') and k!='tmp' and k!='In' and k!='Out' and k!="ID" and k!="AMOUNT"
+		# si no es una funcion
+		value_condition = not hasattr(v, '__call__')
+		return  key_conditions and value_condition
+	tmp = globals().copy()
+	return [k for k,v in tmp.items() if check_condition(k,v)]
+
+def get_user_variables_names_and_values():
+	def check_condition(k,v):
+		# si no s una variable protegida no es tmp (tmp es local) y no es especial
+		key_conditions = not k.startswith('_') and k!='tmp' and k!='In' and k!='Out' and k!="ID" and k!="AMOUNT"
+		# si no es una funcion
+		value_condition = not hasattr(v, '__call__')
+		return  key_conditions and value_condition
+	tmp = globals().copy()
+	return [(k,v) for k,v in tmp.items() if check_condition(k,v)]
+
+def set_variable_value(variable_string_name,value):
+	try:
+		globals()[variable_string_name] = value
+	except Exception as e:
+		print(e)
+		print("[SET VARIABLE VALUE ERROR ] Error setting {} variable with the value : {} ".format(variable_string_name,value))
 

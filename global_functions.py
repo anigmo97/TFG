@@ -8,17 +8,7 @@ from datetime import datetime,timedelta
 def create_list_with_size_ten():
     return [None,None,None,None,None,None,None,None,None,None]
 
-def create_top_ten_list():
-    return [(0,0)] * 10
 
-# def update_top_10_list(lista,tuple_id_amount):
-#     id,amount =tuple_id_amount
-#     if lista[9][global_variables.AMOUNT] < amount :
-#         i = 9
-#         while lista[i][global_variables.AMOUNT] < amount and i >= 0:
-#             lista[i+1] = lista[i]
-#             lista[i] = tuple_id_amount
-#             i-=1
 def create_dir_if_not_exits(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -46,7 +36,7 @@ def update_top_10_list(lista,tuple_id_amount,show=False):
     lista.insert(i,(id,amount))
     if borrar:
         lista.pop()
-    global_variables.count +=1
+    #global_variables.count +=1 #revisar
 
     
 
@@ -129,6 +119,11 @@ def is_tweet(id):
     else:
         return None    
 
+def load_statistics_file_in_global_variables(statistics_file):
+    if not (type(statistics_file) is dict):
+        raise Exception('[LOAD STATISTICS ERROR] Statistics_file debe ser un diccionario')
+    set(globals(global_variables)).issubset(statistics_file.keys())
+
 ###################################################################################################################################
 ###################################################################################################################################
 ################################################# DEBUG METHODS ###################################################################
@@ -209,3 +204,6 @@ def print_all_top_ten_lists():
 
     #print_top_10_list(global_variables.local_most_favs_users,"")
     #print_top_10_list(global_variables.local_most_followers_users,"usuarios de los cuales tenemos mas followers")
+
+x= global_variables.get_user_variables_names()
+print(x)

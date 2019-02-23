@@ -7,6 +7,7 @@ MONGO_HOST= 'mongodb://localhost/tweet'
 client = MongoClient(MONGO_HOST)
 current_collection = "tweets"
 default_collection = "tweets"
+statistics_file_id = "0000000000"
 db = client.twitterdb
 
 
@@ -27,6 +28,14 @@ def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     cursor_resultados = db[collection].find({'_id': {'$in': tweet_ids_list}},{'_id':1})
     tweets_id_list = [x["_id"] for x in cursor_resultados]
     return tweets_id_list
+
+def get_statistics_file_from_collection(collection):
+    cursor_resultados = db[(collection or "tweets")].find({"_id": statistics_file_id } )
+    file_list = [x for x in cursor_resultados]
+    if len(file_list) >1:
+        raise Exception('[MONGO STATISTICS ERROR] Hay mas de un fichero con _id igual al de estadísticas')
+    print(file_list)
+    return file_list[0]
 
 ##########################################################################################
 ##################################### UPDATE   ###########################################
@@ -73,3 +82,4 @@ def insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_ids_list,c
         exit(1)
 
 
+get_statistics_file_from_collection("tweets")
