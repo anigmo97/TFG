@@ -15,6 +15,9 @@ db = client.twitterdb
 ##################################### GET INFO ###########################################
 ##########################################################################################
 
+def get_count_of_a_collection(collection):
+    return db[collection].count()
+
 def get_tweet_ids_list_from_database(collection="tweets"):
     cursor_resultados = db[(collection or "tweets")].find({},{ "id_str": 1, "_id": 0 } )
     tweets_id_list = [x["id_str"] for x in cursor_resultados]
@@ -33,9 +36,21 @@ def get_statistics_file_from_collection(collection):
     cursor_resultados = db[(collection or "tweets")].find({"_id": statistics_file_id } )
     file_list = [x for x in cursor_resultados]
     if len(file_list) >1:
-        raise Exception('[MONGO STATISTICS ERROR] Hay mas de un fichero con _id igual al de estadísticas')
-    print(file_list)
-    return file_list[0]
+        raise Exception('[MONGO STATISTICS ERROR] Hay mas de un fichero con _id igual al de estadísticas : _id ={} '.format(statistics_file_id))
+    elif len(file_list) == 1:
+        print("[MONGO STATISTICS INFO] Fichero de estadísticas correctamente cargado para la colección {}".format(collection))
+        return file_list[0]
+    else:
+        print("[MONGO STATISTICS INFO] No hay fichero de estadísticas para la colección {}".format(collection))
+        return None
+        # if get_count_of_a_collection(collection) > 0:
+        #     print("[MONGO STATISTICS INFO] No hay fichero de estadísticas para la colección {} pero la coleccion tiene registros por lo que se generará uno analizando en primer lugar los tweets de la coleccion".format(collection))
+        #     return (None, True)
+        # else:
+        #     print("[MONGO STATISTICS INFO] No hay fichero de estadísticas para la colección {} y la coleccion no tiene datos, se generará un fichero nuevo con los nuevos mensajes que se recopilen".format(collection))
+        # return (None,False)
+
+
 
 ##########################################################################################
 ##################################### UPDATE   ###########################################
@@ -83,3 +98,4 @@ def insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_ids_list,c
 
 
 get_statistics_file_from_collection("tweets")
+print(get_count_of_a_collection("tweets"))

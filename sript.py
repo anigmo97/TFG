@@ -274,6 +274,8 @@ if __name__ == "__main__":
     fileSystemMode = False
     exist_thread = False
     mongo_conector.current_collection = (args.collection or "tweets")
+
+
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
@@ -283,6 +285,8 @@ if __name__ == "__main__":
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
         json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
         fileSystemMode = True
+
+
     # There is no filesystem options so we are going to check -s -q -qf options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' o -qf de forma simultanea ")
@@ -311,6 +315,10 @@ if __name__ == "__main__":
             thread.start()
             thread.join()
             # consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
+        
+        
+        
+        
         # There is no options in [ -f, -d, -dd, -q, -qf, -s]
     else:
         if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) >1:

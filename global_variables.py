@@ -82,25 +82,36 @@ local_most_replied_tweets = create_top_ten_list()
 local_most_quoted_users = create_top_ten_list()
 local_most_quoted_tweets = create_top_ten_list()
 
+def check_variable_conditions(k,v):
+	# si no s una variable protegida no es tmp (tmp es local) y no es especial
+	key_conditions = not k.startswith('_') and k!='tmp' and k!='In' and k!='Out' and k!="ID" and k!="AMOUNT"
+	# si no es una funcion
+	value_condition = not hasattr(v, '__call__')
+	return  key_conditions and value_condition
+
 def get_user_variables_names():
-	def check_condition(k,v):
-		# si no s una variable protegida no es tmp (tmp es local) y no es especial
-		key_conditions = not k.startswith('_') and k!='tmp' and k!='In' and k!='Out' and k!="ID" and k!="AMOUNT"
-		# si no es una funcion
-		value_condition = not hasattr(v, '__call__')
-		return  key_conditions and value_condition
 	tmp = globals().copy()
-	return [k for k,v in tmp.items() if check_condition(k,v)]
+	return [k for k,v in tmp.items() if check_variable_conditions(k,v)]
 
 def get_user_variables_names_and_values():
-	def check_condition(k,v):
-		# si no s una variable protegida no es tmp (tmp es local) y no es especial
-		key_conditions = not k.startswith('_') and k!='tmp' and k!='In' and k!='Out' and k!="ID" and k!="AMOUNT"
-		# si no es una funcion
-		value_condition = not hasattr(v, '__call__')
-		return  key_conditions and value_condition
 	tmp = globals().copy()
-	return [(k,v) for k,v in tmp.items() if check_condition(k,v)]
+	return [(k,v) for k,v in tmp.items() if check_variable_conditions(k,v)]
+
+def get_statistics_dict():
+	tmp = globals().copy()
+	return { k : v for k,v in tmp.items() if check_variable_conditions(k,v)}
+
+def set_statistics_from_statistics_dict(statistics_dict):
+	variable_names_set = set(get_user_variables_names())
+	statistic_keys_set = set(statistics_dict.keys())
+	if not variable_names_set.issubset(statistic_keys_set):
+		print("[SET STATISTICS DICT ERROR ] The dicctionary pass as argument doesn't contain {}  ".format(variable_names_set.difference(statistic_keys_set)))
+		entrada = input("Press c or C to continue or another key to exit")
+		if entrada.lower() == "c":
+			exit(1)
+	
+	for k,v in statistics_dict.items():
+		set_variable_value(k,v)
 
 def set_variable_value(variable_string_name,value):
 	try:

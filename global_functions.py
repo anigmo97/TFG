@@ -205,5 +205,5 @@ def print_all_top_ten_lists():
     #print_top_10_list(global_variables.local_most_favs_users,"")
     #print_top_10_list(global_variables.local_most_followers_users,"usuarios de los cuales tenemos mas followers")
 
-x= global_variables.get_user_variables_names()
+x= global_variables.get_statistics_dict()
 print(x)
