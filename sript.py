@@ -169,6 +169,42 @@ def recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics
         print("[ RECALCULATE STATISTICS INFO] Messages analyzed sucessfully")
         mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),collection)
 
+
+def analyze_new_versions_of_tweets(current_tweet_dict_list):
+    print("[ANALYZE NEW VERSIONS TWEETS INFO] Starting analysis...")
+    num = 0
+    for current_tweet_dict in current_tweet_dict_list:
+        num+=1
+        # tweet info
+        tweet_id = current_tweet_dict["id_str"]
+
+        # user info
+        user_id = current_tweet_dict["user"]["id_str"]
+        user_name = current_tweet_dict["user"]["name"]
+        user_nickname = current_tweet_dict["user"]["screen_name"] 
+                
+        # We add user info to our user_dict 
+        # key = user_id
+        # value = dictionary with two keys 'names' and 'screen-names' that have a list of names as value
+        add_to_user_dict(user_id,user_name,user_nickname)
+            
+        # We add the current tweet to our tweet dictionary in order to have inmediate access
+        # key = tweet_id
+        # value = json_dict
+        global_variables.tweets_dict[tweet_id] = current_tweet_dict
+
+        #check_polarity(tweet_dict[])
+            
+        # we update our lists every time to keep the ten best scores
+        update_top_10_list(global_variables.global_most_favs_tweets,(tweet_id,current_tweet_dict.get("favorite_count",0)))
+        update_top_10_list(global_variables.global_most_rt_tweets,(tweet_id,current_tweet_dict["retweet_count"]))
+
+        update_top_10_list(global_variables.global_most_favs_users,(user_id,current_tweet_dict["user"]["favourites_count"]))
+        update_top_10_list(global_variables.global_most_tweets_users,(user_id,current_tweet_dict["user"]["statuses_count"]))
+        update_top_10_list(global_variables.global_most_followers_users,(user_id,current_tweet_dict["user"]["followers_count"]))
+            
+    print("[ANALYZE NEW VERSIONS TWEETS INFO] Analysis finished sucessfully {} messages has been updated".format(num))    
+
 def analyze_tweets_from_filesystem(json_files_paths):
     for json_file in json_files_paths:
         current_tweet_dict_list = read_json_file(json_file)
@@ -240,8 +276,6 @@ def analyze_tweets(current_tweet_dict_list):
             
         # we update our lists every time to keep the ten best scores
         update_top_10_list(global_variables.global_most_favs_tweets,(tweet_id,current_tweet_dict.get("favorite_count",0)))
-        [print(x) for x in global_variables.global_most_favs_tweets]
-        input()
         update_top_10_list(global_variables.global_most_rt_tweets,(tweet_id,current_tweet_dict["retweet_count"]))
 
         update_top_10_list(global_variables.global_most_favs_users,(user_id,current_tweet_dict["user"]["favourites_count"]))
@@ -340,7 +374,7 @@ if __name__ == "__main__":
         json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
         fileSystemMode = True
     else:
-        if checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) > 1:
+        if checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) >= 1:
             print("[ MAIN INFO ] The working collection is {}".format(mongo_conector.current_collection))
             statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
             if statistics_file == None:

@@ -41,13 +41,13 @@ class StreamListener(tweepy.StreamListener):
         # self.db = self.client.twitterdb
 
     def show_messages_info(self):
-        print("{} tweets collected in {:.0f} seconds".format(self.streamming_tweets,(time.time() - self.start_time )))
+        print("[SHOWE MESSAGES INFO] {} tweets collected in {:.0f} seconds".format(self.streamming_tweets,(time.time() - self.start_time )))
         self.message_timer.run()
 
     
     def on_connect(self):
         # Called initially to connect to the Streaming API
-        print("You are now connected to the streaming API.")
+        print("[ON CONNECT] You are now connected to the streaming API.")
     
     def finalize_by_time(self):
         self.on_disconnect("Se ha agotado el tiempo maximo especificado por el usuario")
@@ -61,7 +61,7 @@ class StreamListener(tweepy.StreamListener):
             analyze_tweets(self.mongo_tweets_dict.values())
             mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
             mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-            print("FINISH")
+            print("[ON DISCONNECT INFO] FINISH")
         
 
     def on_error(self, status_code):
@@ -71,7 +71,7 @@ class StreamListener(tweepy.StreamListener):
         try:
             codigo= int(status_code)
             if codigo == 420:
-                print("You have reached your rate limit\n")
+                print("[ON ERROR] You have reached your rate limit\n")
         except Exception as e:
             pass
 
@@ -102,13 +102,12 @@ class StreamListener(tweepy.StreamListener):
                     self.mongo_tweets_dict = {}
                     self.mongo_tweets_ids_list = []
                 if(self.streamming_tweets >= self.max_tweets):
-                    print("\n\n{} messages has been collected".format(self.streamming_tweets))
+                    print("[ON_DATA] \n\n{} messages has been collected".format(self.streamming_tweets))
                     self.on_disconnect("User disconnected after get the required amount of tweets")
                     return False # paramos el streamming
                 self.streamming_tweets += 1
         except Exception as e:
-            pass
-            #print("[ON DATA ERROR] {} {}".format(e,e.__cause__))
+            print("[ON DATA ERROR] {} {}".format(e,e.__cause__))
         
 
 
@@ -168,7 +167,7 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
         #while streamming_thread.is_alive: #echo para sincronizar
             #pass
     except Exception as e:
-        print(e)
+        print("[STREAMMING ERROR] {}".format(e))
         #REVISAR
         #streamer.filter(languages=["en","es"],async=True)
     
@@ -185,13 +184,13 @@ def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
 
     i=0
     while i < tweets_for_update:
-        print("{}/{} ({:.3f}%) tweets updated (with {} faileds)  TIME:{}"
+        print("[LOOKUP-TWEETS-IDS INFO]{}/{} ({:.3f}%) tweets updated (with {} faileds)  TIME:{}"
         .format(updated_tweets_count,tweets_for_update,(updated_tweets_count/tweets_for_update)*100,not_collected_tweets_counter,
         time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))))
         try:
             tweets = API.statuses_lookup(tweets_ids_list[i:i+maximum_tweet_ratio])
         except Exception as e:
-            print("[LOOKUP-TWEETS-IDS] {}".format(e))
+            print("[LOOKUP-TWEETS-IDS ERROR] {}".format(e))
             exit(1)
 
         x=0
@@ -217,10 +216,10 @@ def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
         i+=maximum_tweet_ratio
     
 
-    print("\n\nTweets para actualizar = {}".format(tweets_for_update))
-    print("Tweets actualizados = {}".format(tweets_for_update-not_collected_tweets_counter))
-    print("Tweets no actualizados = {}".format(not_collected_tweets_counter))
-    print("Tweets que ya no están en la base de datos de Twitter = {}".format(deleted_tweets_counter))
+    print("\n\n[LOOKUP-TWEETS-IDS INFO] Tweets para actualizar = {}".format(tweets_for_update))
+    print("[LOOKUP-TWEETS-IDS INFO] Tweets actualizados = {}".format(tweets_for_update-not_collected_tweets_counter))
+    print("[LOOKUP-TWEETS-IDS INFO] Tweets no actualizados = {}".format(not_collected_tweets_counter))
+    print("[LOOKUP-TWEETS-IDS INFO] Tweets que ya no están en la base de datos de Twitter = {}".format(deleted_tweets_counter))
 
 
 

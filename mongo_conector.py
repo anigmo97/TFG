@@ -36,6 +36,11 @@ def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     return tweets_id_list
 
 def get_statistics_file_from_collection(collection):
+    def delete_statistics_file():
+        print("[MONGO STATISTICS WARN] Deleting statistics file")
+        db[collection].remove({"_id":'0000000000'})
+        print("[MONGO STATISTICS WARN] Statistics file has been deleted")
+
     cursor_resultados = db[(collection or "tweets")].find({"_id": statistics_file_id } )
     file_list = [x for x in cursor_resultados]
     if len(file_list) >1:
@@ -43,6 +48,15 @@ def get_statistics_file_from_collection(collection):
     elif len(file_list) == 1:
         print("[MONGO STATISTICS INFO] Fichero de estadísticas correctamente recuperado para la colección {}".format(collection))
         statistics_dict = file_list[0]
+        if statistics_dict["messages_count"]==0:
+            print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count=0 se recalcularán las estadísticas...")
+            delete_statistics_file()
+            return None
+        elif get_count_of_a_collection(collection) != statistics_dict["messages_count"]+1:
+            print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count={} database_count={}".format(statistics_dict["messages_count"],get_count_of_a_collection(collection)))
+            delete_statistics_file()
+            return None
+
         way_of_send_with_keys_with_dots =  change_bullet_in_keys_for_dot(statistics_dict["way_of_send_counter"])
         statistics_dict["way_of_send_counter"] = way_of_send_with_keys_with_dots
         return statistics_dict
@@ -119,5 +133,3 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
 
 # get_statistics_file_from_collection("tweets")
 # print(get_count_of_a_collection("tweets"))
-
-print(get_statistics_file_from_collection("test"))

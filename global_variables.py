@@ -84,7 +84,7 @@ local_most_quoted_tweets = create_top_ten_list()
 
 def check_variable_conditions(k,v):
 	# si no s una variable protegida no es tmp (tmp es local) y no es especial
-	key_conditions = not k.startswith('_') and k not in ["tmp","In","Out","ID","AMOUNT"] and not "dict" in k
+	key_conditions = not k.startswith('_') and k not in ["tmp","In","Out","ID","AMOUNT"] and (not "dict" in k or k=="users_dict")
 	# si no es una funcion
 	value_condition = not hasattr(v, '__call__')
 	return  key_conditions and value_condition
