@@ -27,29 +27,46 @@ def parse_sql_query(sql_query):
 	# CREAMOS UN ACCIONADOR PARA BORRAR EL TEXTO Y ESCRIBIR EL NUESTRO
 	accionador = webdriver.ActionChains(driver)
 	accionador.move_to_element(editor).click().perform()
-	Thread(target=lambda: accionador.send_keys(Keys.CONTROL + 'a').perform()).start()
+	accionador.send_keys(Keys.BACK_SPACE * 100).perform()
+	#Thread(target=lambda: accionador.send_keys(Keys.CONTROL + 'a').perform()).start()
 	time.sleep(1)
-	accionador.send_keys(sql_query).perform()
+	thread1 = Thread(target=lambda: accionador.send_keys(sql_query).perform())
+	thread1.start()
+	thread1.join()
+	time.sleep(1)
 	
 	# USAMOS UN NUEVO ACCIONADOR PORQUE SINO SE PUEDEN SOLAPAR
 	boton = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.ID, 'wizard-next-button'))) 
 	webdriver.ActionChains(driver).move_to_element(boton).click().perform()
 	
 
-
+	error = False
 	try:
 		error_div = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.ID, 'query-error-content'))) 
-		print("\n\nQuery Error: {}".format(error_div.text))
-		return False
+		error=True
 	except:
-		return True
+		pass
+
+	if(error):
+		code = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="sql-editor"]/div/div[6]'))).text.split("\n") 
+		for i in range(len(code)//2):
+			print("{:4} {}".format(code[i*2],code[i*2+1]))
+		print("\n\nQuery Error: {}".format(error_div.text))
+		driver.close()
+		return False
+	driver.close()
+	return True
+		
+	
 
 def convert_sql_query_to_mongo_query(sql_query):
+
+	if not sql_query.strip().endswith(";"):
+		sql_query+=';'
 
 	if not parse_sql_query(sql_query):
 		exit(1)
 
-	input()
 
 	url = "http://www.querymongo.com/"
 	driver = webdriver.Chrome(ChromeDriverManager().install())
@@ -57,7 +74,9 @@ def convert_sql_query_to_mongo_query(sql_query):
 
 
 
-	div_interna = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div/form/div[1]/div[3]/div/div/div[2]/div')))
+	#div_interna = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div/form/div[1]/div[3]/div/div/div[2]/div')))
+	#div_interna = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div[1]/form/div[1]/div[3]/div')))
+	div_interna = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div[1]/form/div[1]/div[3]')))
 
 	div_interna.click()
 	print("div_interna_clicado")
@@ -67,12 +86,26 @@ def convert_sql_query_to_mongo_query(sql_query):
 
 	# CREAMOS UN ACCIONADOR PARA BORRAR EL TEXTO Y ESCRIBIR EL NUESTRO
 	accionador = webdriver.ActionChains(driver)
-	accionador.move_to_element(div_interna).click().perform()
-	accionador.send_keys(Keys.DELETE).perform()
-	accionador.move_to_element(div_interna).click().perform()
-	accionador.send_keys(Keys.DELETE).perform()
+	thread1 = Thread(target=lambda: accionador.move_to_element(div_interna).click().perform())
+	thread1.start()
+	thread1.join()
 	time.sleep(1)
-	accionador.send_keys(sql_query).perform()
+
+	accionador.send_keys(Keys.BACK_SPACE * 100).perform()
+
+	thread2 = Thread(target=lambda: accionador.send_keys(Keys.PAGE_UP).perform())
+	thread2.start()
+	thread2.join()
+	time.sleep(1)
+	# thread3 = Thread(target=lambda: accionador.move_to_element(div_interna).click().perform())
+	# thread3.start()
+	# thread3.join()
+	# time.sleep(1)
+
+	thread4 = Thread(target=lambda: accionador.send_keys(sql_query).perform())
+	thread4.start()
+	thread4.join()
+	time.sleep(1)
 
 	# USAMOS UN NUEVO ACCIONADOR PORQUE SINO SE PUEDEN SOLAPAR
 	boton = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div/form/div[2]/button'))) 
@@ -87,9 +120,9 @@ def convert_sql_query_to_mongo_query(sql_query):
 	except:
 		mensaje_error = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div[2]/div'))).text
 		print("\n\n\n{}".format(mensaje_error))
-		
+	
 	driver.close()
 
-resultado = convert_sql_query_to_mongo_query("SELECT * from demo")
-# print(resultado)
+resultado = convert_sql_query_to_mongo_query("SELECT id,num_per,nombre,COUNT(*) from demo where id>0 and nombre LIKE '%ang%' group by id,num_per,nombre")
+print(resultado)
 #print(sqlparse.format("SELECT id from demo WHERE group by x docdsgs "))
