@@ -15,6 +15,7 @@ def parse_sql_query(sql_query):
 	url = "https://www.eversql.com/sql-syntax-check-validator/"
 	driver = webdriver.Chrome(ChromeDriverManager().install())
 	driver.get(url)
+	driver.maximize_window()
 
 	editor = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="sql-editor"]/div/div[6]/div[1]/div/div/div/div[5]')))
 
@@ -71,7 +72,7 @@ def convert_sql_query_to_mongo_query(sql_query):
 	url = "http://www.querymongo.com/"
 	driver = webdriver.Chrome(ChromeDriverManager().install())
 	driver.get(url)
-
+	driver.maximize_window()
 
 
 	#div_interna = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[2]/div/form/div[1]/div[3]/div/div/div[2]/div')))
@@ -123,6 +124,6 @@ def convert_sql_query_to_mongo_query(sql_query):
 	
 	driver.close()
 
-resultado = convert_sql_query_to_mongo_query("SELECT id,num_per,nombre,COUNT(*) from demo where id>0 and nombre LIKE '%ang%' group by id,num_per,nombre")
+resultado = convert_sql_query_to_mongo_query("SELECT user_id,screen_name,COUNT(*) from demo where user_id>0 and nombre LIKE '%ang%' group by user_id,screen_name")
 print(resultado)
 #print(sqlparse.format("SELECT id from demo WHERE group by x docdsgs "))

@@ -3,7 +3,10 @@ from bson.objectid import ObjectId
 from global_functions import change_dot_in_keys_for_bullet,change_bullet_in_keys_for_dot
 import traceback
 import json
+import ast # to load query string to dict
 from datetime import datetime
+import re
+from bson.code import Code
 
 MONGO_HOST= 'mongodb://localhost/tweet'
 client = MongoClient(MONGO_HOST)
@@ -12,6 +15,11 @@ default_collection = "tweets"
 statistics_file_id = "0000000000"
 db = client.twitterdb
 
+not_controlled_functions = ["aggregate","bulkWrite","copyTo","estimatedDocumentCount","createIndex",
+    "createIndexes","dataSize","dropIndex","dropIndexes","ensureIndex","explain"
+    ,"findAndModify","findOneAndDelete","findOneAndReplace","findOneAndUpdate","getIndexes","getShardDistribution",
+    "getShardVersion","insertMany","isCapped","latencyStats","mapReduce","reIndex",
+    "renameCollection","save","storageSize","totalIndexSize","totalSize","watch","validate"]
 
 ##########################################################################################
 ##################################### GET INFO ###########################################
@@ -66,6 +74,64 @@ def get_statistics_file_from_collection(collection):
 
 
 
+
+
+
+def execute_string_query(string_query):
+    collection_name = string_query.split(".")[1]
+    method_name = string_query.split(".")[2].split("(")[0]
+    
+    first_index = string_query.index("{")
+    last_index = len(string_query) - string_query[::-1].index("}")
+    query_body = string_query[first_index:last_index]
+
+    query_dict = parse_string_query(query_body)
+    
+    # print(collection_name)
+    # print(method_name)
+    # print(string_query[first_index:last_index])
+
+    if method_name in not_controlled_functions:
+        print("[MONGO EXECUTE STRING QUERY ERROR ] FUNCION {} ENCONTRADA PERO NO CONTROLADA/IMPLEMENTADA".format(method_name))
+        return None
+    elif method_name == "insert":
+        res = db[collection_name].insert(query_body)
+    elif method_name == "findOne":
+        res = db[collection_name].find_one(query_body)
+    elif method_name == "find":
+        res = db[collection_name].find(query_body)
+    elif method_name == "update":
+        res = db[collection_name].update(query_body)
+    elif method_name == "updateOne":
+        res = db[collection_name].update_one(query_body)
+    elif method_name == "updateMany":
+        res = db[collection_name].update_many(query_body)
+    elif method_name == "count":
+        res = db[collection_name].count(query_body)  
+    elif method_name == "countDocuments":
+        res = db[collection_name].count_documents(query_body)
+    elif method_name == "deleteOne":
+        res = db[collection_name].delete_one(query_body)
+    elif method_name == "deleteMany":
+        res = db[collection_name].delete_many(query_body)
+    elif method_name == "distinct":
+        res = db[collection_name].distinct(query_body)
+    elif method_name == "drop":
+        res = db[collection_name].drop(query_body)
+    elif method_name == "group":
+        res = db[collection_name].group(query_dict["key"],query_dict["cond"],query_dict["initial"],query_dict["reduce"]) #CHECKED
+    elif method_name == "insertOne":
+        res = db[collection_name].insert_one(query_body)
+    elif method_name == "replaceOne":
+        res = db[collection_name].replace_one(query_body)
+    elif method_name == "stats":
+        res = db[collection_name].stats(query_body)
+    elif method_name == "remove":
+        res = db[collection_name].remove(query_body)
+    else:
+        print("[MONGO EXECUTE STRING QUERY ERROR ] FUNCION {} NO ENCONTRADA".format(method_name))
+        return None
+    return res
 
 ##########################################################################################
 ##################################### UPDATE   ###########################################
@@ -133,3 +199,71 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
 
 # get_statistics_file_from_collection("tweets")
 # print(get_count_of_a_collection("tweets"))
+
+
+
+
+def parse_string_query(string_query,show=False):
+    def remove_lateral_spaces_and_quotes(string):
+        aux = string.strip()
+        if aux[0]== '"':
+            aux = aux[1:]
+        if aux[-1]== '"':
+            aux = aux[:-1]
+        if aux[-1]== ',':
+            aux = aux[:-1]
+        return aux
+    # parte de la query puede ser codigo que no esta entre comillas y da problemas por lo que con estas regex,
+    # uno cada key : value del dict en una linea para poder luego controlarlos
+    query2 = re.sub("\s\s\s\s\s\s+", "", string_query) #eliminamos la identacion de los elementos internos
+    query3 = re.sub("\s\s\s\s\s+}", "}", query2) #eliminamos la identacion de los diccionarios valores
+    query4 = query3.split("\n")[1:-1] # Separamos por líneas dejando en cada linea la key y su valor y eliminamos los {} mas externos
+    query5 = [ x.split(":",1) for x in query4] # separamos el contenido de cada línea en key value
+    query6 = [(remove_lateral_spaces_and_quotes(x[0]),remove_lateral_spaces_and_quotes(x[1])) for x in query5] # quitamos los espacios laterales y las comillas externas
+    
+    if(show):
+        print(query2)
+        print(query3)
+        print(query4)
+        for e in query5:
+            print(e)
+        for e in query6:
+            print(e)
+
+    query_dict = {}
+    for key,value in query6:
+        if value.startswith("{"):
+            query_dict[key] = json.loads(value)
+        elif value.startswith("function"):
+            query_dict[key] = Code(value)
+        else:
+            print("\n\n\n[MONGO PARSE STRING QUERY ERROR] Value doesn't controlled {}".format(value))
+            exit(1)
+
+    for k,v in query_dict.items():
+        print("{}    {}".format(k,v))
+
+    return query_dict
+
+
+query='''db.tweets.group({
+    "key": {
+        "user_id": true,
+        "screen_name": true
+    },
+    "initial": {
+        "countstar": 0
+    },
+    "reduce": function(obj, prev) {
+        if (true != null) if (true instanceof Array) prev.countstar += true.length;
+        else prev.countstar++;
+    },
+    "cond": {
+        "user_id": {
+            "$gt": 0
+        },
+        "nombre": "%ang%"
+    }
+});'''
+
+execute_string_query(query)
