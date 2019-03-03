@@ -124,6 +124,10 @@ def convert_sql_query_to_mongo_query(sql_query):
 	
 	driver.close()
 
-resultado = convert_sql_query_to_mongo_query("SELECT user_id,screen_name,COUNT(*) from demo where user_id>0 and nombre LIKE '%ang%' group by user_id,screen_name")
+resultado = convert_sql_query_to_mongo_query("SELECT user.id from tweets Group by user.id")
 print(resultado)
 #print(sqlparse.format("SELECT id from demo WHERE group by x docdsgs "))
+
+
+# QUERYS COMPROBADAS
+# "SELECT user.id,COUNT(*) from tweets  group by user.id"

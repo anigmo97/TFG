@@ -20,7 +20,7 @@ not_controlled_functions = ["aggregate","bulkWrite","copyTo","estimatedDocumentC
     ,"findAndModify","findOneAndDelete","findOneAndReplace","findOneAndUpdate","getIndexes","getShardDistribution",
     "getShardVersion","insertMany","isCapped","latencyStats","mapReduce","reIndex",
     "renameCollection","save","storageSize","totalIndexSize","totalSize","watch","validate"]
-
+#additional_function_pattern = re.compile(".*\)\.(\w+)\(.*")
 ##########################################################################################
 ##################################### GET INFO ###########################################
 ##########################################################################################
@@ -119,7 +119,7 @@ def execute_string_query(string_query):
     elif method_name == "drop":
         res = db[collection_name].drop(query_body)
     elif method_name == "group":
-        res = db[collection_name].group(query_dict["key"],query_dict["cond"],query_dict["initial"],query_dict["reduce"]) #CHECKED
+        res = db[collection_name].group(query_dict["key"],query_dict.get("cond",{}),query_dict["initial"],query_dict["reduce"]) #CHECKED
     elif method_name == "insertOne":
         res = db[collection_name].insert_one(query_body)
     elif method_name == "replaceOne":
@@ -199,20 +199,17 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
 
 # get_statistics_file_from_collection("tweets")
 # print(get_count_of_a_collection("tweets"))
+def remove_lateral_spaces_and_quotes(string):
+    aux = string.strip()
+    if aux[0]== '"':
+        aux = aux[1:]
+    if aux[-1]== '"':
+        aux = aux[:-1]
+    if aux[-1]== ',':
+        aux = aux[:-1]
+    return aux
 
-
-
-
-def parse_string_query(string_query,show=False):
-    def remove_lateral_spaces_and_quotes(string):
-        aux = string.strip()
-        if aux[0]== '"':
-            aux = aux[1:]
-        if aux[-1]== '"':
-            aux = aux[:-1]
-        if aux[-1]== ',':
-            aux = aux[:-1]
-        return aux
+def build_query_dict_for_unique_dict(string_query,show=False):
     # parte de la query puede ser codigo que no esta entre comillas y da problemas por lo que con estas regex,
     # uno cada key : value del dict en una linea para poder luego controlarlos
     query2 = re.sub("\s\s\s\s\s\s+", "", string_query) #eliminamos la identacion de los elementos internos
@@ -221,14 +218,6 @@ def parse_string_query(string_query,show=False):
     query5 = [ x.split(":",1) for x in query4] # separamos el contenido de cada línea en key value
     query6 = [(remove_lateral_spaces_and_quotes(x[0]),remove_lateral_spaces_and_quotes(x[1])) for x in query5] # quitamos los espacios laterales y las comillas externas
     
-    if(show):
-        print(query2)
-        print(query3)
-        print(query4)
-        for e in query5:
-            print(e)
-        for e in query6:
-            print(e)
 
     query_dict = {}
     for key,value in query6:
@@ -237,19 +226,68 @@ def parse_string_query(string_query,show=False):
         elif value.startswith("function"):
             query_dict[key] = Code(value)
         else:
-            print("\n\n\n[MONGO PARSE STRING QUERY ERROR] Value doesn't controlled {}".format(value))
+            print("\n\n\n[MONGO build_query_dict_for_unique_dict ] Value doesn't controlled {}".format(value))
             exit(1)
-
-    for k,v in query_dict.items():
-        print("{}    {}".format(k,v))
 
     return query_dict
 
+def parse_string_query(string_query,show=False):
+    print(string_query)
+    input()
 
-query='''db.tweets.group({
+    functions_called = re.findall("\)\.(\w+)\(",string_query)
+    if len(functions_called)>0:
+        end_index = string_query.index(functions_called[0])-2
+        string_query = string_query[:end_index]
+        print(" DELETED END FUNCTIONS\n {}".format(string_query))
+
+    result_is_one_dict = False
+    should_be_builded = False
+    result_dict = {}
+    if string_query.split("\n")[0]=="{":
+        result_is_one_dict = True
+    if "function(" in string_query:
+        should_be_builded = True
+
+    if result_is_one_dict and should_be_builded:
+        result_dict = build_query_dict_for_unique_dict(string_query,show)
+    elif result_is_one_dict and not should_be_builded:
+        result_dict = json.loads(string_query)
+    elif not result_is_one_dict and should_be_builded:
+        pass
+    else:
+        #CONTINUAR: VER COMO SEPARAR LOS DICTS
+        lines = string_query.split("\n")
+        strings_list = []
+        aux = []
+        for line in lines:
+            for letter_index in range(len(line)):
+                aux.append(line[letter_index])
+                if line[letter_index] =='}' and letter_index <= 5:
+                    strings_list.append("".join(aux).strip())
+                    aux=[]
+
+        for e in strings_list:
+            if e.startswith(","):
+                e = e[1:]
+            print(e)
+        pass
+    
+    for k,v in result_dict.items():
+        print("{}    {}".format(k,v))
+    
+    return result_dict
+
+
+query='''db.tweets.find({}, {
+    "user.id": 1
+}).sort({
+    "user.id": 1
+});'''
+
+query2 = '''db.tweets.group({
     "key": {
-        "user_id": true,
-        "screen_name": true
+        "user.id": true
     },
     "initial": {
         "countstar": 0
@@ -257,13 +295,15 @@ query='''db.tweets.group({
     "reduce": function(obj, prev) {
         if (true != null) if (true instanceof Array) prev.countstar += true.length;
         else prev.countstar++;
-    },
-    "cond": {
-        "user_id": {
-            "$gt": 0
-        },
-        "nombre": "%ang%"
     }
 });'''
 
-execute_string_query(query)
+query3='''db.tweets.group({
+    "key": {
+        "user.id": true
+    },
+    "initial": {}
+});'''
+
+resultado = execute_string_query(query)
+print(resultado)
