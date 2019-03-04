@@ -7,6 +7,7 @@ import ast # to load query string to dict
 from datetime import datetime
 import re
 from bson.code import Code
+import prueba_selenium
 
 MONGO_HOST= 'mongodb://localhost/tweet'
 client = MongoClient(MONGO_HOST)
@@ -305,5 +306,93 @@ query3='''db.tweets.group({
     "initial": {}
 });'''
 
-resultado = execute_string_query(query)
-print(resultado)
+def divide_string_query(string_query):
+    first_index = string_query.index("{")
+    last_index = len(string_query) - string_query[::-1].index("}")
+
+    start = string_query[:first_index]
+    body = string_query[first_index:last_index]
+    end = string_query[last_index:]
+    return start,body,end
+
+def divide_dicts(string_lined):
+    lines = string_lined.split("\n")
+    strings_list = []
+    #nombres = { 0: '"condition" :', 1: '"key" :'}
+    aux = []
+    for line in lines:
+        for letter_index in range(len(line)):
+            aux.append(line[letter_index])
+            if line[letter_index] =='}' and letter_index <= 5:
+                linea_unida ="".join(aux).strip()
+                linea_unida = re.sub(r"(,?\s*{)\s*(.*})",r"\1 \2",linea_unida)
+                if linea_unida.startswith(","):
+                    linea_unida = linea_unida[1:]
+                strings_list.append(linea_unida)
+                aux=[]
+    return strings_list
+
+    
+    
+    
+
+entrada="-"
+while entrada !='':
+    entrada = input("introduce\n")
+    res = prueba_selenium.convert_sql_query_to_mongo_query(entrada)
+    print(res)
+    start,body,end = divide_string_query(res)
+    print("start = {}\n\n\n".format(start))
+    print("body = {}\n\n\n".format(body))
+    print("end = {}\n\n\n".format(end))
+
+    body_lined = re.sub("\s\s\s\s\s+}", "}", re.sub("\s\s\s\s\s\s+", "", body)) # ponemos en una linea cada elemento principal
+    #body_lined_with_code = re.sub(r" (function\(.*\)\s*{.*})", r' Code("\1")', body_lined) # cambiamos las funciones por llamadas a Code
+    print("body_lined = {}\n\n\n".format(body_lined))
+    if len(re.findall("\n}",body_lined))>1:
+        multiple_dicts = True
+        #body_lined = divide_dicts(body_lined)
+        # ponemos las funciones entre comillas para poder cargar el json (no ponemos el constructor Code(porque fallaría))
+        body_lined_with_string_funtions = re.sub(r" (function\(.*\)\s*{.*})", r' "\1"', body_lined)
+        print(body_lined_with_string_funtions)
+        string_dict_list = divide_dicts(body_lined_with_string_funtions)
+        body_lined_parsed_list = [json.loads(s) for s in string_dict_list]
+        new_dict_list = [{} for i in range(len(body_lined_parsed_list))]        
+    else:
+        multiple_dicts = False
+        # ponemos las funciones entre comillas para poder cargar el json (no ponemos el constructor Code(porque fallaría))
+        body_lined_with_string_funtions = re.sub(r" (function\(.*\)\s*{.*})", r' "\1"', body_lined)
+        print(body_lined_with_string_funtions)
+        body_lined_parsed_list = [json.loads(body_lined_with_string_funtions)] 
+        new_dict_list = [ {"key":{},"condition":{},"initial":{},"reduce":{}} ]
+    
+
+    for i in range(len(body_lined_parsed_list)):   
+        for k,v in body_lined_parsed_list[i].items():
+            if type(v) == str and v.startswith("function"):
+                new_dict_list[i][k] = Code(v)
+            elif type(v) == bool and v:
+                new_dict_list[i][k] = 1
+            elif type(v) == bool and not v:
+                new_dict_list[i][k] = 0
+            else:
+                new_dict_list[i][k] = v
+
+    if not multiple_dicts:
+        query_linked = "{}**{}{}".format(start,str(new_dict_list[0]),end) # ponemos ** para que tome las keys del dict como nombre de argumento
+    else:
+        query_linked = "{}{}{}".format(start,",".join([str(e) for e in new_dict_list]),end)
+    print(query_linked)
+    input()
+    exec("res = {}".format(query_linked))
+    print([e for e in res])
+
+# resultado = execute_string_query(query)
+# print(resultado)
+#   select user.id,count(*) from tweets group by user.id
+#   select user.id from tweets where user.id > 10000
+body_lined = '''{
+    "key": {"user.id": true},
+    "initial": {"countstar": 0},
+    "reduce": function(obj, prev) {if (true != null) if (true instanceof Array) prev.countstar += true.length;else prev.countstar++;}
+}'''

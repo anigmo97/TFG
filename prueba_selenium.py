@@ -9,12 +9,20 @@ import time
 from threading import Thread
 
 
-
 def parse_sql_query(sql_query):
 
 	url = "https://www.eversql.com/sql-syntax-check-validator/"
-	driver = webdriver.Chrome(ChromeDriverManager().install())
-	driver.get(url)
+
+	try:
+		driver = webdriver.Chrome(ChromeDriverManager().install())
+		driver.get(url)
+		
+	except Exception as e:
+		print("[PARSE SQL QUERY ERROR] Error conecting")
+		print(e)
+		exit(1)
+
+	
 	driver.maximize_window()
 
 	editor = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="sql-editor"]/div/div[6]/div[1]/div/div/div/div[5]')))
@@ -124,8 +132,8 @@ def convert_sql_query_to_mongo_query(sql_query):
 	
 	driver.close()
 
-resultado = convert_sql_query_to_mongo_query("SELECT user.id from tweets Group by user.id")
-print(resultado)
+#resultado = convert_sql_query_to_mongo_query("SELECT user.id from tweets Group by user.id")
+
 #print(sqlparse.format("SELECT id from demo WHERE group by x docdsgs "))
 
 
