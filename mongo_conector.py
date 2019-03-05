@@ -339,6 +339,7 @@ def divide_dicts(string_lined):
 entrada="-"
 while entrada !='':
     entrada = input("introduce\n")
+    
     res = prueba_selenium.convert_sql_query_to_mongo_query(entrada)
     print(res)
     start,body,end = divide_string_query(res)
@@ -369,6 +370,9 @@ while entrada !='':
 
     for i in range(len(body_lined_parsed_list)):   
         for k,v in body_lined_parsed_list[i].items():
+            if k =="distinct":
+                new_dict_list[i]["command"] = k
+                new_dict_list[i]["collection"] = v
             if type(v) == str and v.startswith("function"):
                 new_dict_list[i][k] = Code(v)
             elif type(v) == bool and v:
@@ -377,22 +381,52 @@ while entrada !='':
                 new_dict_list[i][k] = 0
             else:
                 new_dict_list[i][k] = v
+        if not multiple_dicts:
+            if "cond" in new_dict_list[i]:
+                new_dict_list[i]["condition"] = new_dict_list[i].get("cond",{})
+                del new_dict_list[i]["cond"]
+    #AÑADIR IS NOT NULL
+
 
     if not multiple_dicts:
         query_linked = "{}**{}{}".format(start,str(new_dict_list[0]),end) # ponemos ** para que tome las keys del dict como nombre de argumento
     else:
         query_linked = "{}{}{}".format(start,",".join([str(e) for e in new_dict_list]),end)
     print(query_linked)
-    input()
+    if "runCommand" in query_linked:
+        query_linked = query_linked.replace("runCommand","command")
+        query_linked = re.sub(r"(.*).values.length",r'len(\1["values"])',query_linked)
+        isCommand = True
+    else:
+        isCommand = False
+
+    query_linked = query_linked.replace(r"this.\\FALSE","false")
+    query_linked = query_linked.replace(r"this.\\TRUE","true")
+    print(query_linked)
     exec("res = {}".format(query_linked))
-    print([e for e in res])
+    if isCommand:
+        if type(res) ==int:
+            print(res)
+        else:
+            print(res['values'])
+    else:
+        print(type(res))
+        [print(e) for e in res]
 
 # resultado = execute_string_query(query)
 # print(resultado)
 #   select user.id,count(*) from tweets group by user.id
 #   select user.id from tweets where user.id > 10000
+#   SELECT user.id,count(*) from tweets where user.verified =false group by user.id 
+#   SELECT DISTINCT user.id from tweets
+#   SELECT COUNT(DISTINCT user.id) from tweets
+# ERROR   SELECT user.id,count(user.id) from tweets where user.verified =true group by user.id
+# ERROR   SELECT user.id,count(user.id) from tweets where user.verified =true group by user.id ORDER BY user.id
+# ERROR  select id_str, sum(favorite_count.value) from tweets where favorite_count <> 'null' group by id_str having count(*) > 1 
+# select id from tweets where id >10000
 body_lined = '''{
     "key": {"user.id": true},
     "initial": {"countstar": 0},
     "reduce": function(obj, prev) {if (true != null) if (true instanceof Array) prev.countstar += true.length;else prev.countstar++;}
 }'''
+

@@ -69,6 +69,7 @@ def parse_sql_query(sql_query):
 	
 
 def convert_sql_query_to_mongo_query(sql_query):
+	sql_query = sql_query.replace("<>","!=")
 
 	if not sql_query.strip().endswith(";"):
 		sql_query+=';'
@@ -76,6 +77,14 @@ def convert_sql_query_to_mongo_query(sql_query):
 	if not parse_sql_query(sql_query):
 		exit(1)
 
+	sql_query = sql_query.replace(" true"," \TRUE")
+	sql_query = sql_query.replace(" TRUE"," \TRUE")
+	sql_query = sql_query.replace(" false"," \FALSE")
+	sql_query = sql_query.replace(" FALSE"," \FALSE")
+	sql_query = sql_query.replace("=true","=\TRUE")
+	sql_query = sql_query.replace("=TRUE","=\TRUE")
+	sql_query = sql_query.replace("=false","=\FALSE")
+	sql_query = sql_query.replace("=FALSE","=\FALSE")
 
 	url = "http://www.querymongo.com/"
 	driver = webdriver.Chrome(ChromeDriverManager().install())
