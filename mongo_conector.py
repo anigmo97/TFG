@@ -340,6 +340,15 @@ entrada="-"
 while entrada !='':
     entrada = input("introduce\n")
     
+    entrada = entrada.lower()
+    for palabra in ["select","from","where","group","by","having","count","distinct","table","order","sum","avg","true","false","is","not","null"]:
+        entrada = re.sub(",{}".format(palabra),",{}".format(palabra.upper()),entrada)
+        entrada = re.sub("\({}".format(palabra),"\({}".format(palabra.upper()),entrada)
+        entrada = re.sub("\s{}".format(palabra),"\s{}".format(palabra.upper()),entrada)
+        entrada = re.sub("={}".format(palabra),"={}".format(palabra.upper()),entrada)
+    
+    #not_ins = re.findall("(\w+)\s+IS+\s+NOT\s+NULL")
+
     res = prueba_selenium.convert_sql_query_to_mongo_query(entrada)
     print(res)
     start,body,end = divide_string_query(res)

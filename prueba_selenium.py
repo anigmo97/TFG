@@ -2,6 +2,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 from selenium import webdriver
 import sqlparse
@@ -14,6 +15,8 @@ def parse_sql_query(sql_query):
 	url = "https://www.eversql.com/sql-syntax-check-validator/"
 
 	try:
+		#chrome_options = Options()  
+		#chrome_options.add_argument("--headless")
 		driver = webdriver.Chrome(ChromeDriverManager().install())
 		driver.get(url)
 		
