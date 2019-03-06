@@ -13,6 +13,7 @@ try:
     from BeautifulSoup import BeautifulSoup
 except ImportError:
     from bs4 import BeautifulSoup
+import datetime
 
 
 
@@ -64,7 +65,80 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id):
 	return result_list
 
 
+def get_tweets_of_a_user_until(screen_name):
+	date = "2/2/2019"
+	url = 'https://twitter.com/' + screen_name
+	date_limit = datetime.datetime.strptime(date, "%d/%m/%Y")
+	date_limit_epoch = date_limit.strftime('%s')
+	print(date_limit)
+	print(date_limit_epoch)
+	driver.get(url)
+	# los retweets entan en divs y los tweets en li
+	#reteets <span class="_timestamp js-short-timestamp"
+	#<span class="_timestamp js-short-timestamp " data-aria-label-part="last" data-time="1551546578" data-time-ms="1551546578000" data-long-form="true">Mar 2</span>
+	fin = False
+	height = driver.execute_script("return document.documentElement.scrollHeight")
+	while not fin:
+		driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+		time.sleep(0.5)
+		#elements = driver.find_elements(By.CLASS_NAME,"tweet")
+		elements = driver.find_elements(By.CSS_SELECTOR,"div.original-tweet.tweet") #recuperamos por los que tengan ambas clases para eliminar un elemento al final molesto
+		# print(len(elements))
+		# for e in elements:
+		# 	print(e.get_attribute("class"))
+		# 	input()
+		# input()
+		#times = elements[-1].find_elements_by_css_selector("small[class='time']")
+		# for e in times:
+		# 	print(e.get_attribute("innerHTML"))
+		# 	input()
+		time_of_last_tweet = elements[-1].find_elements_by_css_selector("span[class*='_timestamp js-short-timestamp ']")[0]
+		datatime = time_of_last_tweet.get_attribute("data-time")
+		date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(datatime)))
+		print(date)
+		if datatime <= date_limit_epoch:
+			fin=True
+		if height == driver.execute_script("return document.documentElement.scrollHeight"):
+			fin=True
+	
+	# obtenemos los tweets y retweets
+	lista_tweets = []
+	lista_retweets = []
+	for e in elements:
 
+		print(e.get_attribute("innerHTML"))
+		try:
+			tweet_id = e.get_attribute("data-tweet-id")
+			creator_name = e.get_attribute("data-name")
+			creator_screen_name = e.get_attribute("data-screen-name")
+			#retweet info
+			retweeted_tweet_id = e.get_attribute("data-retweet-id")
+			retwitter_screen_name = e.get_attribute("data-retweeter")
+			#creation info
+			time_section = e.find_elements_by_css_selector("span[class*='_timestamp js-short-timestamp ']")[0]
+			datatime = time_section.get_attribute("data-time")
+			date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(datatime)))
+		except Exception as e:
+			print("[ERROR GETTING INFO OF A TWEET OF USER]")
+
+		print("\n"*3)
+		print("tweet_id = {}".format(tweet_id))
+		print("nombre_creador = {}".format(creator_name))
+		print("nickname_creador = {}".format(creator_screen_name))
+
+		print("fecha creacion = {}".format(date))
+		if retweeted_tweet_id!= None:
+			print("tipo = retweet")
+			print("retweeted_tweet_id = {}".format(retweeted_tweet_id))
+			print("usuario que retuiteó = {}".format(retwitter_screen_name))
+			lista_retweets.append(tweet_id)
+		else:
+			print("tipo = tweet")
+			lista_tweets.append(tweet_id)
+		# hacer comprobación para que no se pasen el límite
+		input()
+
+	input()
 
 
 
@@ -102,7 +176,7 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
 						#rt_users.append(users.attrib['data-user-id'])
 						# 
 						user_id = users.attrib.get('data-user-id',None)
-						fav_users.append((user_id,user_name,user_nickname))
+						fav_users.append(user_id)
 					else:                        
                         #fav_users.append(users.attrib['data-user-id'])
 						rt_users.append(users.attrib['data-user-id'])
@@ -113,6 +187,6 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
 #example
 if __name__ == '__main__':
 	driver = open_twitter_and_login()
-	print(get_last_users_who_liked_a_tweet('Albert_Rivera', '1100705346291683328'))
-	input()
+	#print(get_last_users_who_liked_a_tweet('Albert_Rivera', '1100705346291683328'))
+	get_tweets_of_a_user_until("Albert_Rivera")
 	driver.close()
