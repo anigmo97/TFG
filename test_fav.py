@@ -65,48 +65,71 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id):
 	return result_list
 
 
-def get_tweets_of_a_user_until(screen_name):
-	date = "2/2/2019"
+def get_tweets_of_a_user_until(screen_name,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):
 	url = 'https://twitter.com/' + screen_name
-	date_limit = datetime.datetime.strptime(date, "%d/%m/%Y")
-	date_limit_epoch = date_limit.strftime('%s')
-	print(date_limit)
-	print(date_limit_epoch)
+	
+	if date_limit != False:
+		if type(date_limit) == str:
+			try:
+				local_date_limit = datetime.datetime.strptime(date_limit, "%d/%m/%Y")
+				date_limit_epoch = int(local_date_limit.strftime('%s'))
+			except:
+				raise Exception("[GET TWEETS OF A USR UNTIL ERROR] Error setting date ( date format= 'dd/mm/YYYY)")
+		elif isinstance(date_limit, datetime.datetime):
+			date_limit_epoch = int(date_limit.strftime('%s'))
+		elif type(date_limit) == int:
+			date_limit_epoch = date_limit
+		else:
+			raise Exception("date_limit has to be int, datetime.datetime or str ( date format= 'dd/mm/YYYY)")
+
+		date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(date_limit_epoch))
+		print("[DATE LIMIT STABLISHED] {}".format(date))
+
+	if tweet_id_limit != False:
+		tipo = type(tweet_id_limit)
+		if tipo == int:
+			tweet_id_limit = str(tweet_id_limit)
+		check_tweet_id = 'data-tweet-id="{}"'.format(tweet_id_limit)
+		print("[TWEET_ID LIMIT STABLISHED] {}".format(check_tweet_id))
+	if num_messages_limit != False:
+		if type(num_messages_limit) != int:
+			raise Exception("[GET TWEETS OF A USR UNTIL ERROR] num_messages_limit should be an int")
+	
+
 	driver.get(url)
-	# los retweets entan en divs y los tweets en li
-	#reteets <span class="_timestamp js-short-timestamp"
-	#<span class="_timestamp js-short-timestamp " data-aria-label-part="last" data-time="1551546578" data-time-ms="1551546578000" data-long-form="true">Mar 2</span>
 	fin = False
-	height = driver.execute_script("return document.documentElement.scrollHeight")
 	while not fin:
+		height = driver.execute_script("return document.documentElement.scrollHeight")
 		driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-		time.sleep(0.5)
-		#elements = driver.find_elements(By.CLASS_NAME,"tweet")
-		elements = driver.find_elements(By.CSS_SELECTOR,"div.original-tweet.tweet") #recuperamos por los que tengan ambas clases para eliminar un elemento al final molesto
-		# print(len(elements))
-		# for e in elements:
-		# 	print(e.get_attribute("class"))
-		# 	input()
-		# input()
-		#times = elements[-1].find_elements_by_css_selector("small[class='time']")
-		# for e in times:
-		# 	print(e.get_attribute("innerHTML"))
-		# 	input()
-		time_of_last_tweet = elements[-1].find_elements_by_css_selector("span[class*='_timestamp js-short-timestamp ']")[0]
-		datatime = time_of_last_tweet.get_attribute("data-time")
-		date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(datatime)))
-		print(date)
-		if datatime <= date_limit_epoch:
-			fin=True
+		time.sleep(0.7)
+		# recuperamos por los que tengan ambas clases ya que hay elementos que no nos interesan solo con una de ellas
+		elements = driver.find_elements(By.CSS_SELECTOR,"div.original-tweet.tweet")
+
+		if date_limit !=False:
+			time_of_last_tweet = elements[-1].find_elements_by_css_selector("span[class*='_timestamp js-short-timestamp ']")[0]
+			datatime = int(time_of_last_tweet.get_attribute("data-time"))
+			date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(datatime))
+			if datatime <= date_limit_epoch:
+				fin = True
+		if num_messages_limit != False:
+			fin = len(elements)>=num_messages_limit
+		if tweet_id_limit != False:
+			html_with_messages = driver.find_element(By.CLASS_NAME,"stream").get_attribute('innerHTML')
+			if check_tweet_id in html_with_messages:
+				fin = True
 		if height == driver.execute_script("return document.documentElement.scrollHeight"):
+			print("Bottom REACHED")
+			#TODO wait two reaches to exit
 			fin=True
+			
 	
 	# obtenemos los tweets y retweets
 	lista_tweets = []
 	lista_retweets = []
-	for e in elements:
+	for i in range(len(elements)):
+		e = elements[i]
 
-		print(e.get_attribute("innerHTML"))
+		#print(e.get_attribute("innerHTML"))
 		try:
 			tweet_id = e.get_attribute("data-tweet-id")
 			creator_name = e.get_attribute("data-name")
@@ -120,25 +143,42 @@ def get_tweets_of_a_user_until(screen_name):
 			date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(datatime)))
 		except Exception as e:
 			print("[ERROR GETTING INFO OF A TWEET OF USER]")
+		if date_limit != False:
+			if int(datatime) < date_limit_epoch:
+				print("break\n\n")
+				break
+		if tweet_id_limit !=False:
+			if tweet_id <= tweet_id_limit:
+				print("break\n\n")
+				break
+		if num_messages_limit != False and i >= num_messages_limit:
+			print("break\n\n")
+			break 
 
-		print("\n"*3)
-		print("tweet_id = {}".format(tweet_id))
-		print("nombre_creador = {}".format(creator_name))
-		print("nickname_creador = {}".format(creator_screen_name))
 
-		print("fecha creacion = {}".format(date))
 		if retweeted_tweet_id!= None:
-			print("tipo = retweet")
-			print("retweeted_tweet_id = {}".format(retweeted_tweet_id))
-			print("usuario que retuiteó = {}".format(retwitter_screen_name))
 			lista_retweets.append(tweet_id)
 		else:
-			print("tipo = tweet")
 			lista_tweets.append(tweet_id)
-		# hacer comprobación para que no se pasen el límite
-		input()
 
-	input()
+		if show:
+			print("\n"*3)
+			print("tweet_id = {}".format(tweet_id))
+			print("nombre_creador = {}".format(creator_name))
+			print("nickname_creador = {}".format(creator_screen_name))
+			print("fecha creacion = {}".format(date))
+			if retweeted_tweet_id!= None:
+				print("tipo = retweet")
+				print("retweeted_tweet_id = {}".format(retweeted_tweet_id))
+				print("usuario que retuiteó = {}".format(retwitter_screen_name))
+			else:
+				print("tipo = tweet")
+		# if date_limit != False:
+		# 	print("fecha creacion = {}".format(date))
+		#input()
+
+	#input()
+	return (lista_tweets,lista_retweets)
 
 
 
@@ -188,5 +228,28 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
 if __name__ == '__main__':
 	driver = open_twitter_and_login()
 	#print(get_last_users_who_liked_a_tweet('Albert_Rivera', '1100705346291683328'))
-	get_tweets_of_a_user_until("Albert_Rivera")
+	
+	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL
+	#get_tweets_of_a_user_until("Albert_Rivera")
+	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL HASTA UN TWEET ID
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit=1100127150420754438)
+	print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
+
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit="1100127150420754438")
+	print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
+
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=1551125726)
+	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit="25/02/2019")
+	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=datetime.datetime(2019,2,25,0,0,0))
+	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",num_messages_limit=10)
+	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+
+	print(limited_list)
+
 	driver.close()
