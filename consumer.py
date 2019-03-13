@@ -135,15 +135,24 @@ def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",f
         API = tweepy.API(auth)
         mongo_tweets_dict = {}
         mongo_tweets_id_list = [] 
-        for status in tweepy.Cursor(API.search, q=query,count=100,lang="es", since="2017-04-03").items(max_tweets):
+        for status in tweepy.Cursor(API.search,q=query,count=100,lang="es", since="2017-04-03").items(max_tweets):
             tweet = status._json
             if(tweet.get("id_str",False) != False):
                 tweet_id = tweet["id_str"]
                 tweet["_id"]= tweet_id
                 mongo_tweets_id_list.append(tweet_id)
                 mongo_tweets_dict[tweet_id] = tweet
+        
+        max_tweet_id = mongo_tweets_id_list[0]
+        min_tweet_id = mongo_tweets_id_list[-1]
+        min_creation_date = mongo_tweets_dict[min_tweet_id]["created_at"]
+        max_creation_date = mongo_tweets_dict[max_tweet_id]["created_at"]
+
         print("{} tweets capturados".format(len(mongo_tweets_id_list)))
         tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
+        
+        mongo_conector.insert_or_update_query_file(mongo_conector.current_collection,query,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date)
+
         return  tweets_sin_repetir
 
 

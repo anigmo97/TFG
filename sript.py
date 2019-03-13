@@ -420,3 +420,9 @@ if __name__ == "__main__":
         if not checkParameter(args.streamming): # streamming los analiza e inserta sobre la marcha
             analyze_tweets(tweets_files_list)
             mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+
+    
+
+
+    # borrar
+    print(json.dumps(mongo_conector.get_query_file("test2"),indent=4,sort_keys=True))

@@ -32,7 +32,7 @@ def get_tweet_ids_list_from_database(collection="tweets"):
 
 def get_tweets_cursor_from_mongo(collection="tweets"):
     print("[MONGO GET CURSOR INFO] Coleccion = {}".format(collection))
-    return db[(collection or "tweets")].find({'_id': {'$nin': [statistics_file_id]}})
+    return db[(collection or "tweets")].find({'_id': {'$nin': [statistics_file_id, query_file_id]}})
 
 def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     map(ObjectId,tweet_ids_list)
@@ -69,6 +69,24 @@ def get_statistics_file_from_collection(collection):
         print("[MONGO STATISTICS INFO] No hay fichero de estadísticas para la colección {}".format(collection))
         return None
 
+
+def get_query_file(collection):
+    cursor_resultados = db[(collection or "tweets")].find({"_id": query_file_id})
+    file_list = [ x for x in cursor_resultados]
+    if len(file_list) >1:
+        raise Exception('[MONGO QUERY_FILE ERROR] Hay mas de un fichero con _id igual al de querys: _id = {}'.format(query_file_id))
+    elif len(file_list) == 1:
+        print("[MONGO QUERY_FILE INFO] Fichero de querys correctamente recuperado para la colección {}".format(collection))
+        return file_list[0]
+    else:
+        print("[MONGO QUERY_FILE INFO] No hay fichero de querys para la colección {}".format(collection))
+        return None
+
+def get_querys_from_query_file(query_dict):
+    if query_dict !=None:
+        return [ query_dict[str(i)]["query"] for i in range(len(query_dict)-1) ]
+    else:
+        return []
 
 
 ##########################################################################################
@@ -133,4 +151,54 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
         print("[MONGO INSERT STATISTICS FILE INFO] Replacing statistics file")
         db[collection].replace_one({"_id" : statistics_file_id },statistics_dict) 
         print("[MONGO INSERT STATISTICS FILE INFO] The statistics file has been replaced save sucessfully")
+
+
+def insert_or_update_query_file(collection, query,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date ):
+    query_dict = get_query_file(collection)
+    if query_dict != None:
+        nuevo_fichero = False
+        query_list = get_querys_from_query_file(query_dict)
+    else:
+        nuevo_fichero =True
+        query_list = []
+        query_dict = {"_id" : query_file_id}
+    #TODO improve comprobation
+    if query not in query_list:
+        aux = {}
+        aux["query"] = query
+        aux["last_execution"] = str(datetime.now())
+        aux["max_tweet_id"] = max_tweet_id
+        aux["min_tweet_id"] = min_tweet_id
+        aux["min_creation_date"] = min_creation_date
+        aux["max_creation_date"] = max_creation_date
+        aux["search_type"] = "tweets captured by query"
+        aux["captured_tweets"] = captured_tweets
+        query_dict[str(len(query_dict)-1)]= aux
+    else:
+        l = []
+        for i in range(len(query_dict)-1):
+            value = query_dict[str(i)]
+            if value["query"] == query:
+                l.append(str(i))
+        index=l[0]
+        aux = query_dict[index]
+        aux["last_execution"] = str(datetime.now())
+        aux["max_tweet_id"] = max(max_tweet_id,aux["max_tweet_id"])
+        aux["min_tweet_id"] = min(min_tweet_id,aux["min_tweet_id"])
+        aux["min_creation_date"] = min(str(min_creation_date),aux["min_creation_date"])
+        aux["max_creation_date"] = max(str(max_creation_date),aux["max_creation_date"])
+        aux["captured_tweets"] = aux["captured_tweets"]+captured_tweets
+        query_dict[index] = aux
+         
+    
+    if nuevo_fichero:
+        db[collection].insert(query_dict)
+    else:
+        db[collection].replace_one({"_id" : query_file_id },query_dict)
+    
+
+
+
+
+
 
