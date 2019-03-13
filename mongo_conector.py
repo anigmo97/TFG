@@ -14,6 +14,7 @@ current_collection = "tweets"
 default_collection = "tweets"
 statistics_file_id = "0000000000"
 query_file_id = "1111111111"
+streamming_file_id = "2222222222"
 db = client.twitterdb
 
 
@@ -32,7 +33,7 @@ def get_tweet_ids_list_from_database(collection="tweets"):
 
 def get_tweets_cursor_from_mongo(collection="tweets"):
     print("[MONGO GET CURSOR INFO] Coleccion = {}".format(collection))
-    return db[(collection or "tweets")].find({'_id': {'$nin': [statistics_file_id, query_file_id]}})
+    return db[(collection or "tweets")].find({'_id': {'$nin': [statistics_file_id, query_file_id, streamming_file_id]}})
 
 def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     map(ObjectId,tweet_ids_list)
@@ -57,7 +58,7 @@ def get_statistics_file_from_collection(collection):
             print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count=0 se recalcularán las estadísticas...")
             delete_statistics_file()
             return None
-        elif get_count_of_a_collection(collection) != statistics_dict["messages_count"]+1:
+        elif get_count_of_a_collection(collection) not in range(statistics_dict["messages_count"],statistics_dict["messages_count"]+4):
             print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count={} database_count={}".format(statistics_dict["messages_count"],get_count_of_a_collection(collection)))
             delete_statistics_file()
             return None
@@ -82,9 +83,27 @@ def get_query_file(collection):
         print("[MONGO QUERY_FILE INFO] No hay fichero de querys para la colección {}".format(collection))
         return None
 
+def get_streamming_file(collection):
+    cursor_resultados = db[(collection or "tweets")].find({"_id": streamming_file_id})
+    file_list = [ x for x in cursor_resultados]
+    if len(file_list) >1:
+        raise Exception('[MONGO STREAMMING_FILE ERROR] Hay mas de un fichero con _id igual al de streamming: _id = {}'.format(streamming_file_id))
+    elif len(file_list) == 1:
+        print("[MONGO STREAMMING_FILE INFO] Fichero de querys correctamente recuperado para la colección {}".format(collection))
+        return file_list[0]
+    else:
+        print("[MONGO STREAMMING_FILE INFO] No hay fichero de querys para la colección {}".format(collection))
+        return None
+
 def get_querys_from_query_file(query_dict):
     if query_dict !=None:
         return [ query_dict[str(i)]["query"] for i in range(len(query_dict)-1) ]
+    else:
+        return []
+
+def get_list_of_words_comprobation_list_from_streamming_file(streamming_dict):
+    if streamming_dict !=None:
+        return [ streamming_dict[str(i)]["words_comprobation"] for i in range(len(streamming_dict)-1) ]
     else:
         return []
 
@@ -192,9 +211,69 @@ def insert_or_update_query_file(collection, query,captured_tweets, min_tweet_id,
          
     
     if nuevo_fichero:
+        print("[MONGO INSERT QUERY FILE INFO] Inserting new query file")
         db[collection].insert(query_dict)
+        print("[MONGO INSERT QUERY FILE INFO] The query file has been save sucessfully")
     else:
+        print("[MONGO INSERT QUERY FILE INFO] Replacing query file")
         db[collection].replace_one({"_id" : query_file_id },query_dict)
+        print("[MONGO INSERT QUERY FILE INFO] The query file has been replaced save sucessfully")
+
+
+
+def insert_or_update_query_file_streamming(collection, words_list ,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date ):
+    streamming_dict = get_streamming_file(collection)
+    if streamming_dict != None:
+        print("[MONGO INSERT STREAMMING FILE INFO] There is streamming file")
+        nuevo_fichero = False
+        comprobation_words_list = get_list_of_words_comprobation_list_from_streamming_file(streamming_dict)
+    else:
+        print("[MONGO INSERT STREAMMING FILE INFO] THERE IS NO streamming file")
+        nuevo_fichero =True
+        comprobation_words_list = []
+        streamming_dict = {"_id" : streamming_file_id}
+
+    #TODO improve comprobation
+    words_comprobation =",".join(sorted([i.lower() for i in words_list]))
+    if words_comprobation not in comprobation_words_list:
+        print("[MONGO INSERT STREAMMING FILE INFO] Words are not in file")
+        aux = {}
+        aux["words"] = words_list
+        aux["words_comprobation"] = words_comprobation
+        aux["last_execution"] = str(datetime.now())
+        aux["max_tweet_id"] = max_tweet_id
+        aux["min_tweet_id"] = min_tweet_id
+        aux["min_creation_date"] = min_creation_date
+        aux["max_creation_date"] = max_creation_date
+        aux["search_type"] = "tweets captured by streamming"
+        aux["captured_tweets"] = captured_tweets
+        streamming_dict[str(len(streamming_dict)-1)]= aux
+    else:
+        print("[MONGO INSERT STREAMMING FILE INFO] Words are in file")
+        l = []
+        for i in range(len(streamming_dict)-1):
+            value = streamming_dict[str(i)]
+            if value["words_comprobation"] == words_comprobation:
+                l.append(str(i))
+        index=l[0]
+        aux = streamming_dict[index]
+        aux["last_execution"] = str(datetime.now())
+        aux["max_tweet_id"] = max(max_tweet_id,aux["max_tweet_id"])
+        aux["min_tweet_id"] = min(min_tweet_id,aux["min_tweet_id"])
+        aux["min_creation_date"] = min(str(min_creation_date),aux["min_creation_date"])
+        aux["max_creation_date"] = max(str(max_creation_date),aux["max_creation_date"])
+        aux["captured_tweets"] = aux["captured_tweets"]+captured_tweets
+        streamming_dict[index] = aux
+         
+    
+    if nuevo_fichero:
+        print("[MONGO INSERT STREAMMING FILE INFO] Inserting new streamming file")
+        db[collection].insert(streamming_dict)
+        print("[MONGO INSERT STREAMMING FILE INFO] The query streamming has been save sucessfully")
+    else:
+        print("[MONGO INSERT STREAMMING FILE INFO] Replacing streamming file")
+        db[collection].replace_one({"_id" : streamming_file_id },streamming_dict)
+        print("[MONGO INSERT STREAMMING FILE INFO] The streamming file has been replaced save sucessfully")
     
 
 

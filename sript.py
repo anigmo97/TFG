@@ -295,7 +295,7 @@ def analyze_tweets(current_tweet_dict_list):
             print("[ANALYZE_TWEETS WARN] There are duplicates in the messages analyzed")
             input() 
 
-    show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
+    #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
     print('\n\nMensajes analizados: {} Time: {}'.format(global_variables.messages_count,timeit.default_timer() - start))
 
@@ -425,4 +425,4 @@ if __name__ == "__main__":
 
 
     # borrar
-    print(json.dumps(mongo_conector.get_query_file("test2"),indent=4,sort_keys=True))
+    #print(json.dumps(mongo_conector.get_query_file("test2"),indent=4,sort_keys=True))

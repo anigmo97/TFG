@@ -23,10 +23,11 @@ auth.set_access_token(access_token, access_secret)
 class StreamListener(tweepy.StreamListener):    
     #This is a class provided by tweepy to access the Twitter Streaming API. 
     
-    def __init__(self,api=None,max_tweets=10000,max_mins=10):
+    def __init__(self,api=None,max_tweets=10000,max_mins=10,words_list=None):
         self.streamming_tweets = 0
         self.max_mins = max_mins
         self.max_tweets = max_tweets
+        self.words_list = words_list
         self.start_time = time.time()
         self.message_timer = Timer(5,self.show_messages_info)
         self.message_timer.start()
@@ -36,12 +37,16 @@ class StreamListener(tweepy.StreamListener):
         self.mongo_tweets_ids_list = []
         self.tweets_no_repetidos = []
         self.trunk= min(500,max_tweets)
+        self.first_tweet_id = None
+        self.last_tweet_id = None
+        self.max_created_at = None
+        self.min_created_at = None
         # self.client = MongoClient(mongo_conector.MONGO_HOST)
         # # Use twitterdb database. If it doesn't exist, it will be created.
         # self.db = self.client.twitterdb
 
     def show_messages_info(self):
-        print("[SHOWE MESSAGES INFO] {} tweets collected in {:.0f} seconds".format(self.streamming_tweets,(time.time() - self.start_time )))
+        print("[SHOW MESSAGES INFO] {} tweets collected in {:.0f} seconds".format(self.streamming_tweets,(time.time() - self.start_time )))
         self.message_timer.run()
 
     
@@ -58,9 +63,11 @@ class StreamListener(tweepy.StreamListener):
         print("[ON DISCONNECT INFO] {}".format(notice))
         print("[ON DISCONNECT INFO] You are now disconnected to the streaming API.\n\n")
         if len (self.mongo_tweets_ids_list)>0:
-            analyze_tweets(self.mongo_tweets_dict.values())
-            mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
+            #coger lo que retorna el insert many
+            tweets_no_reps = mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
+            analyze_tweets(tweets_no_reps)
             mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+            mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,self.streamming_tweets,self.first_tweet_id,self.last_tweet_id,self.min_created_at, self.max_created_at)
             print("[ON DISCONNECT INFO] FINISH")
         
 
@@ -91,6 +98,13 @@ class StreamListener(tweepy.StreamListener):
             datajson = get_mongo_document(data) # controlamos los errores antes de insertarlo
             if datajson is not None:
                 #analizar tweet
+                current_tweet_id = datajson["id_str"]
+                current_created_at = datajson["created_at"]
+                self.last_tweet_id = current_tweet_id
+                self.max_created_at = current_created_at
+                if self.first_tweet_id == None:
+                    self.first_tweet_id = current_tweet_id
+                    self.min_created_at = current_created_at
                 self.mongo_tweets_dict[datajson["_id"]] = datajson
                 self.mongo_tweets_ids_list.append(datajson["_id"])
                 if len(self.mongo_tweets_ids_list) > self.trunk:
@@ -99,6 +113,7 @@ class StreamListener(tweepy.StreamListener):
                     print("[ON DATA INFO] {} messages are going to be analyzed".format(len(self.tweets_no_repetidos)))
                     analyze_tweets(self.tweets_no_repetidos)
                     mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                    mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,self.streamming_tweets,self.first_tweet_id,current_tweet_id,self.min_created_at, current_created_at)
                     self.mongo_tweets_dict = {}
                     self.mongo_tweets_ids_list = []
                 if(self.streamming_tweets >= self.max_tweets):
@@ -161,7 +176,7 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
     print("words {}\t max_tweets {} \t max_mins {}".format(WORDS,max_tweets,max_mins))
     try:
         API = tweepy.API(wait_on_rate_limit=True)
-        listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins) 
+        listener = StreamListener(api=API,max_tweets=max_tweets,max_mins=max_mins,words_list=WORDS) 
         streamer = tweepy.Stream(auth=auth, listener=listener)
         print("Tracking: " + str(WORDS))
         if len(WORDS) > 0:
