@@ -25,9 +25,9 @@ def open_twitter_and_login():
 	username_text_field = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[class='js-username-field email-input js-initial-focus']")))
 	password_text_field = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[class='js-password-field']")))
 	
-	username_text_field.send_keys("angeltecnolo@gmail.com")
+	username_text_field.send_keys("")
 	driver.implicitly_wait(1)
-	password_text_field.send_keys("contraseña_tfg")
+	password_text_field.send_keys("")
 	driver.implicitly_wait(1)
 	login_button  = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[class='submit EdgeButton EdgeButton--primary EdgeButtom--medium']")))
 	accionador.move_to_element(login_button).click().perform()

@@ -7,7 +7,6 @@ import ast # to load query string to dict
 from datetime import datetime
 import re
 from bson.code import Code
-import prueba_selenium
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -283,6 +282,62 @@ def get_result(variable_to_check,is_command):
 		print(type(variable_to_check))
 		return [e for e in variable_to_check]
 
+def check_additional_condition_to_add(sql_query):
+	additional_conds = []
+	if "WHERE" in sql_query:
+		not_nulls = re.findall("(\w+\.\w+)\s+IS+\s+NOT\s+NULL",sql_query) #solo implementado para elementos hijos
+		for e in not_nulls:
+			k = e 
+			v = { '$exists': True }
+			additional_conds.append((k,v))
+		nulls = re.findall("(\w+\.\w+)\s+IS\s+NULL",sql_query) #solo implementado para elementos hijos
+		for e in nulls:
+			k = e 
+			v = { '$exists': False }
+			additional_conds.append((k,v))
+	print(additional_conds)
+	input()
+	return additional_conds
+
+def add_additional_conds_to_dict(new_dict_list,additional_conds_list,body_has_multiple_dicts):
+	if body_has_multiple_dicts:
+		for e in additional_conds_list:
+			if new_dict_list[0].get(e[0],"-") != "-":
+				if type(new_dict_list[0][e[0]]) != dict:
+					old_value = new_dict_list[0][e[0]]  
+					new_value = {  }
+					"$where": "this.user.verified == this.\\TRUE"
+					# add in where clause
+				else:
+					aux = new_dict_list[0][e[0]]
+					for key,value in e[1].items():
+						aux[key] = value
+					new_dict_list[0][e[0]]= aux
+			else:
+				new_dict_list[0][e[0]] = e[1]
+	else: #checkear que se cumple siempre que la condicion es el primer dict
+		for e in additional_conds_list:
+			if new_dict_list[0].get("condition",None) != None:
+				condition_dict = new_dict_list[0]["condition"]
+				if condition_dict.get(e[0],None) != None:
+					aux = condition_dict[e[0]]
+					for key,value in e[1].items():
+						aux[key] = value
+					new_dict_list[0]["condition"][e[0]] = aux
+				else:
+					new_dict_list[0]["condition"][e[0]] = e[1]
+			elif new_dict_list[0].get("cond",None) != None:
+				if new_dict_list[0]["cond"].get(e[0],None) != None:
+					condition_dict = new_dict_list[0]["cond"]
+					if condition_dict.get(e[0],None) != None:
+						aux = condition_dict[e[0]]
+						for key,value in e[1].items():
+							aux[key] = value
+						new_dict_list[0]["cond"][e[0]] = aux
+				else:
+					new_dict_list[0]["cond"][e[0]] = e[1]
+	
+	return new_dict_list
 
 
 def get_final_command_to_execute(entrada):
@@ -305,6 +360,8 @@ def get_final_command_to_execute(entrada):
 	
 	body_has_multiple_dicts = check_multiple_dicts_in_formatted_mongo_query(mongo_string_query_formatted)
 
+	additional_conds_list = check_additional_condition_to_add(entrada)
+
 	if body_has_multiple_dicts:
 		string_dict_list = divide_dicts(mongo_string_query_formatted)
 		body_lined_parsed_list = [json.loads(s) for s in string_dict_list]
@@ -312,8 +369,21 @@ def get_final_command_to_execute(entrada):
 	else:
 		body_lined_parsed_list = [json.loads(mongo_string_query_formatted)] 
 		new_dict_list = [ {"key":{},"condition":{},"initial":{},"reduce":{}} ]
+
+	for d in body_lined_parsed_list:
+		for k,v in d.items():
+			print("{} {}".format(k,v))
+
+	new_dict_list = add_additional_conds_to_dict(body_lined_parsed_list,additional_conds_list,body_has_multiple_dicts)
+
+	print("\n\n")
+	for d in body_lined_parsed_list:
+		for k,v in d.items():
+			print("{} {}".format(k,v))
     
 	new_dict_list = change_body_to_pymongo_compatible(body_lined_parsed_list,new_dict_list,body_has_multiple_dicts)
+
+	
 
 
 	code_to_exec_without_assign = get_python_code_to_execute(start,new_dict_list,end,body_has_multiple_dicts)
@@ -334,7 +404,7 @@ def get_final_command_to_execute(entrada):
 #   SELECT user.id,count(*) from tweets where user.verified =false group by user.id 
 #   SELECT DISTINCT user.id from tweets
 #   SELECT COUNT(DISTINCT user.id) from tweets
-# ERROR	SELECT user.id,count(user.id) from tweets where user.verified is not null and user.verified =true group by user.id
+# ERROR	SELECT user.id,count(*) from tweets where user.verified is not null and user.verified =true group by user.id
 # ERROR   SELECT user.id,count(user.id) from tweets where user.verified =true group by user.id
 # ERROR   SELECT user.id,count(user.id) from tweets where user.verified =true group by user.id ORDER BY user.id
 # ERROR  select id_str, sum(favorite_count.value) from tweets where favorite_count <> 'null' group by id_str having count(*) > 1 
@@ -373,11 +443,12 @@ query3='''db.tweets.group({
 });'''
 
 lista_querys= [
-	"select user.id,count(*) from tweets group by user.id",
-	"select user.id from tweets where user.id > 10000",
-	"SELECT user.id,count(*) from tweets where user.verified =false group by user.id",
-	"SELECT DISTINCT user.id from tweets",
-	"SELECT COUNT(DISTINCT user.id) from tweets",
+	#"select user.id,count(*) from tweets group by user.id",
+	#"select user.id from tweets where user.id > 10000",
+	#"SELECT user.id,count(*) from tweets where user.verified =false group by user.id",
+	#"SELECT DISTINCT user.id from tweets",
+	#"SELECT COUNT(DISTINCT user.id) from tweets",
+	"SELECT user.id from demo where user.verified is null",
 	"SELECT user.id,count(user.id) from tweets where user.verified is not null and user.verified =true group by user.id",
 	"SELECT user.id,count(user.id) from tweets where user.verified =true group by user.id",
 	"SELECT user.id,count(user.id) from tweets where user.verified =true group by user.id ORDER BY user.id",
@@ -385,6 +456,11 @@ lista_querys= [
 	"select id from tweets where id >10000"
 ]
 
+# exec("res = db.demo.find({'user.verified': None},{'user.id': 1});")
+# print([e for e in res])
+# input()
+# exec("res = db.tweets.group(**{'key': {'user.id': True}, 'condition': {'user.verified': {'$exists': True, '$ne': None}, '$where': 'this.user.verified == true'}, 'reduce': Code('function(obj, prev) {if (obj.user.id != null) if (obj.user.id instanceof Array) prev.countuser.id += obj.user.id.length;else prev.countuser.id++;}', None), 'initial': {'countuser.id': 0}});")
+# print(res)
 
 for query in lista_querys:
 	try:

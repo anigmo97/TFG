@@ -144,7 +144,7 @@ def collect_tweets_by_query_and_save_in_file(max_tweets=3000,query="#science",fi
         #dumps -> dump string
 
 
-def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",filename="tweets"): 
+def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",filename="tweets",until_tweet_id=None): 
         print("[ QUERY TO MONGO INFO ] Collectings tweets by query = '{}'".format(query))
         #wait_on_rate_limit = True, wait_on_rate_limit_notify = True
         API = tweepy.API(auth)
@@ -154,6 +154,8 @@ def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",f
             tweet = status._json
             if(tweet.get("id_str",False) != False):
                 tweet_id = tweet["id_str"]
+                if until_tweet_id != None and tweet_id < until_tweet_id:
+                    break
                 tweet["_id"]= tweet_id
                 mongo_tweets_id_list.append(tweet_id)
                 mongo_tweets_dict[tweet_id] = tweet
