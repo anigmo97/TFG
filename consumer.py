@@ -224,8 +224,8 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
     print("{} tweets capturados".format(len(mongo_tweets_id_list)))
     tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
 
-    
-    mongo_conector.insert_or_update_user_file(mongo_conector.current_collection,user_screen_name,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date)
+    user_id = API.get_user(screen_name = user_screen_name).id_str
+    mongo_conector.insert_or_update_searched_users_file(mongo_conector.current_collection,user_screen_name,user_id,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date)
     return  tweets_sin_repetir
 
 def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):

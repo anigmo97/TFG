@@ -10,13 +10,21 @@ from bson.code import Code
 
 MONGO_HOST= 'mongodb://localhost/tweet'
 client = MongoClient(MONGO_HOST)
+db = client.twitterdb
+
 current_collection = "tweets"
 default_collection = "tweets"
-statistics_file_id = "0000000000"
-query_file_id = "1111111111"
-streamming_file_id = "2222222222"
-users_file_id = "3333333333"
-db = client.twitterdb
+
+###################### SPECIAL DOCS #######################################################
+statistics_file_id = "statistics_file_id"
+query_file_id = "query_file_id"
+streamming_file_id = "streamming_file_id"
+searched_users_file_id = "searched_users_file_id"
+likes_list_file_id = "likes_list_file_id"
+users_file_id = "users_file_id"
+
+special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id]
+
 
 
 #additional_function_pattern = re.compile(".*\)\.(\w+)\(.*")
@@ -29,12 +37,17 @@ def get_count_of_a_collection(collection):
 
 def get_tweet_ids_list_from_database(collection="tweets"):
     cursor_resultados = db[(collection or "tweets")].find({},{ "id_str": 1, "_id": 0 } )
-    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["id_str"] != statistics_file_id ]
+    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["id_str"] not in special_doc_ids ]
+    return tweets_id_list
+
+def get_tweet_ids_list_of_a_user_from_collection(user_id,collection="tweets"):
+    cursor_resultados = db[(collection or "tweets")].find({"user.id_str" : user_id},{ "id_str": 1, "_id": 0 } )
+    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["id_str"] not in special_doc_ids ]
     return tweets_id_list
 
 def get_tweets_cursor_from_mongo(collection="tweets"):
     print("[MONGO GET CURSOR INFO] Coleccion = {}".format(collection))
-    return db[(collection or "tweets")].find({'_id': {'$nin': [statistics_file_id, query_file_id, streamming_file_id]}})
+    return db[(collection or "tweets")].find({'_id': {'$nin': special_doc_ids }})
 
 def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     map(ObjectId,tweet_ids_list)
@@ -45,7 +58,7 @@ def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
 def get_statistics_file_from_collection(collection):
     def delete_statistics_file():
         print("[MONGO STATISTICS WARN] Deleting statistics file")
-        db[collection].remove({"_id":'0000000000'})
+        db[collection].remove({"_id":statistics_file_id})
         print("[MONGO STATISTICS WARN] Statistics file has been deleted")
 
     cursor_resultados = db[(collection or "tweets")].find({"_id": statistics_file_id } )
@@ -96,16 +109,16 @@ def get_streamming_file(collection):
         print("[MONGO STREAMMING_FILE INFO] No hay fichero de querys para la colección {}".format(collection))
         return None
 
-def get_users_file(collection):
-    cursor_resultados = db[(collection or "tweets")].find({"_id": users_file_id})
+def get_searched_users_file(collection):
+    cursor_resultados = db[(collection or "tweets")].find({"_id": searched_users_file_id})
     file_list = [ x for x in cursor_resultados]
     if len(file_list) >1:
-        raise Exception('[MONGO USERS_FILE ERROR] Hay mas de un fichero con _id igual al de usuarios: _id = {}'.format(streamming_file_id))
+        raise Exception('[MONGO SEARCHED_USERS_FILE ERROR] Hay mas de un fichero con _id igual al de usuarios: _id = {}'.format(searched_users_file_id))
     elif len(file_list) == 1:
-        print("[MONGO USERS_FILE INFO] Fichero de usuarios correctamente recuperado para la colección {}".format(collection))
+        print("[MONGO SEARCHED_USERS_FILE INFO] Fichero de usuarios correctamente recuperado para la colección {}".format(collection))
         return file_list[0]
     else:
-        print("[MONGO USERS_FILE INFO] No hay fichero de usuarios para la colección {}".format(collection))
+        print("[MONGO SEARCHED_USERS_FILE INFO] No hay fichero de usuarios para la colección {}".format(collection))
     return None
 
 def get_users_from_users_file(users_dict):
@@ -298,20 +311,21 @@ def insert_or_update_query_file_streamming(collection, words_list ,captured_twee
     
 
 
-def insert_or_update_user_file(collection, user,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date):
+def insert_or_update_searched_users_file(collection, user,user_id,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date):
     user= user.lower()
-    users_dict = get_users_file(collection)
+    users_dict = get_searched_users_file(collection)
     if users_dict != None:
         nuevo_fichero = False
         users_list = get_users_from_users_file(users_dict)
     else:
         nuevo_fichero =True
         users_list = []
-        users_dict = {"_id" : users_file_id}
+        users_dict = {"_id" : searched_users_file_id}
     #TODO improve comprobation
     if user not in users_list:
         aux = {}
         aux["user"] = user
+        aux["user_id"] = user_id
         aux["last_execution"] = str(datetime.now())
         aux["max_tweet_id"] = max_tweet_id
         aux["min_tweet_id"] = min_tweet_id
@@ -336,8 +350,6 @@ def insert_or_update_user_file(collection, user,captured_tweets, min_tweet_id, m
         print("[MONGO INSERT USER FILE INFO] The user file has been save sucessfully")
     else:
         print("[MONGO INSERT USER FILE INFO] Replacing user file")
-        db[collection].replace_one({"_id" : users_file_id },users_dict)
+        db[collection].replace_one({"_id" : searched_users_file_id },users_dict)
         print("[MONGO INSERT USER FILE INFO] The user file has been replaced save sucessfully")
-
-
 
