@@ -196,7 +196,37 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
         print("[STREAMMING ERROR] {}".format(e))
         #REVISAR
         #streamer.filter(languages=["en","es"],async=True)
+
+def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,until_tweet_id=None):
+    print("[ QUERY USER TO MONGO INFO ] Collectings tweets by user = '{}'".format(user_screen_name))
+    #wait_on_rate_limit = True, wait_on_rate_limit_notify = True
+    API = tweepy.API(auth)
+    mongo_tweets_dict = {}
+    mongo_tweets_id_list = [] 
+    #for status in tweepy.Cursor(API.user_timeline,screen_name=user_screen_name,include_rts = True,tweet_mode="extended").items(max_tweets):
+    for status in tweepy.Cursor(API.user_timeline,screen_name=user_screen_name,count=100,include_rts = True).items(max_tweets):
+        tweet = status._json
+        if(tweet.get("id_str",False) != False):
+            tweet_id = tweet["id_str"]
+            if until_tweet_id != None and tweet_id < until_tweet_id:
+                print("\n\nbreak\n\n")
+                break
+            tweet["_id"]= tweet_id
+            mongo_tweets_id_list.append(tweet_id)
+            mongo_tweets_dict[tweet_id] = tweet
+
+    if len(mongo_tweets_id_list)>0:    
+        max_tweet_id = mongo_tweets_id_list[0]
+        min_tweet_id = mongo_tweets_id_list[-1]
+        min_creation_date = mongo_tweets_dict[min_tweet_id]["created_at"]
+        max_creation_date = mongo_tweets_dict[max_tweet_id]["created_at"]
+
+    print("{} tweets capturados".format(len(mongo_tweets_id_list)))
+    tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
+
     
+    mongo_conector.insert_or_update_user_file(mongo_conector.current_collection,user_screen_name,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date)
+    return  tweets_sin_repetir
 
 def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
     start_time = time.time()

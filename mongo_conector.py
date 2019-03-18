@@ -15,6 +15,7 @@ default_collection = "tweets"
 statistics_file_id = "0000000000"
 query_file_id = "1111111111"
 streamming_file_id = "2222222222"
+users_file_id = "3333333333"
 db = client.twitterdb
 
 
@@ -94,6 +95,26 @@ def get_streamming_file(collection):
     else:
         print("[MONGO STREAMMING_FILE INFO] No hay fichero de querys para la colección {}".format(collection))
         return None
+
+def get_users_file(collection):
+    cursor_resultados = db[(collection or "tweets")].find({"_id": users_file_id})
+    file_list = [ x for x in cursor_resultados]
+    if len(file_list) >1:
+        raise Exception('[MONGO USERS_FILE ERROR] Hay mas de un fichero con _id igual al de usuarios: _id = {}'.format(streamming_file_id))
+    elif len(file_list) == 1:
+        print("[MONGO USERS_FILE INFO] Fichero de usuarios correctamente recuperado para la colección {}".format(collection))
+        return file_list[0]
+    else:
+        print("[MONGO USERS_FILE INFO] No hay fichero de usuarios para la colección {}".format(collection))
+    return None
+
+def get_users_from_users_file(users_dict):
+    if users_dict !=None:
+        aux = users_dict
+        del aux["_id"]
+        return aux.keys()
+    else:
+        return []    
 
 def get_querys_from_query_file(query_dict):
     if query_dict !=None:
@@ -277,7 +298,46 @@ def insert_or_update_query_file_streamming(collection, words_list ,captured_twee
     
 
 
+def insert_or_update_user_file(collection, user,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date):
+    user= user.lower()
+    users_dict = get_users_file(collection)
+    if users_dict != None:
+        nuevo_fichero = False
+        users_list = get_users_from_users_file(users_dict)
+    else:
+        nuevo_fichero =True
+        users_list = []
+        users_dict = {"_id" : users_file_id}
+    #TODO improve comprobation
+    if user not in users_list:
+        aux = {}
+        aux["user"] = user
+        aux["last_execution"] = str(datetime.now())
+        aux["max_tweet_id"] = max_tweet_id
+        aux["min_tweet_id"] = min_tweet_id
+        aux["min_creation_date"] = min_creation_date
+        aux["max_creation_date"] = max_creation_date
+        aux["search_type"] = "tweets captured by user"
+        aux["captured_tweets"] = captured_tweets
+        users_dict[user]= aux
+    else:
+        aux = users_dict[user]
+        aux["last_execution"] = str(datetime.now())
+        aux["max_tweet_id"] = max(max_tweet_id,aux["max_tweet_id"])
+        aux["min_tweet_id"] = min(min_tweet_id,aux["min_tweet_id"])
+        aux["min_creation_date"] = min(str(min_creation_date),aux["min_creation_date"])
+        aux["max_creation_date"] = max(str(max_creation_date),aux["max_creation_date"])
+        aux["captured_tweets"] = aux["captured_tweets"]+captured_tweets
+        users_dict[user] = aux
 
+    if nuevo_fichero:
+        print("[MONGO INSERT USER FILE INFO] Inserting new user file")
+        db[collection].insert(users_dict)
+        print("[MONGO INSERT USER FILE INFO] The user file has been save sucessfully")
+    else:
+        print("[MONGO INSERT USER FILE INFO] Replacing user file")
+        db[collection].replace_one({"_id" : users_file_id },users_dict)
+        print("[MONGO INSERT USER FILE INFO] The user file has been replaced save sucessfully")
 
 
 
