@@ -10,6 +10,7 @@ from global_functions import update_top_10_list,throw_error,notNone,checkParamet
 from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict,create_dir_if_not_exits
 from logger import show_info,show_parameters
 import twitter_api_consumer as consumer
+import twitter_web_consumer
 import mongo_conector
 from threading import Thread
 
@@ -467,7 +468,8 @@ if __name__ == "__main__":
                     if user_id != None:
                         ids = mongo_conector.get_tweet_ids_list_of_a_user_from_collection(user_id,mongo_conector.current_collection)
                         for tweet_id in ids:
-                            pass
+                            users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id)
+                            input()
                             # loop and refresh likes
 
             tweets_files_list = []

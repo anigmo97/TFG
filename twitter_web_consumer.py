@@ -35,6 +35,7 @@ def open_twitter_and_login():
 
 
 def get_last_users_who_liked_a_tweet(screen_name, tweet_id):
+	driver = open_twitter_and_login()
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
 	try:
 		#chrome_options = Options()  
@@ -66,6 +67,7 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id):
 
 
 def get_tweets_of_a_user_until(screen_name,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):
+	driver = open_twitter_and_login()
 	url = 'https://twitter.com/' + screen_name
 	
 	if date_limit != False:
@@ -184,6 +186,7 @@ def get_tweets_of_a_user_until(screen_name,date_limit=False,tweet_id_limit=False
 
 #returns list(retweet users),list(favorite users) for a given screen_name and status_id
 def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
+	driver = open_twitter_and_login()
 	url = urllib.request.urlopen('https://twitter.com/' + screen_name + '/status/' + status_id)
 	root = parse(url).getroot()
 
@@ -224,9 +227,10 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
 	return rt_users, fav_users
 
 
-#example
+
+
 if __name__ == '__main__':
-	driver = open_twitter_and_login()
+	#driver = open_twitter_and_login()
 	#print(get_last_users_who_liked_a_tweet('Albert_Rivera', '1100705346291683328'))
 	
 	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL
