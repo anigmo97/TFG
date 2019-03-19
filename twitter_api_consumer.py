@@ -7,7 +7,7 @@ import global_variables
 from global_functions import get_utc_time
 import mongo_conector
 from threading import Timer,Thread
-from sript import analyze_tweets
+from main_script import analyze_tweets
 
 now = datetime.datetime.now()
 

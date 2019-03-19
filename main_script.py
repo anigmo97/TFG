@@ -9,7 +9,7 @@ import global_variables
 from global_functions import update_top_10_list,throw_error,notNone,checkParameter,isJsonFile,increment_dict_counter
 from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict,create_dir_if_not_exits
 from logger import show_info,show_parameters
-import consumer
+import twitter_api_consumer as consumer
 import mongo_conector
 from threading import Thread
 
@@ -463,6 +463,13 @@ if __name__ == "__main__":
                         tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
                     analyze_tweets(tweets_files_list)
                     mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                    user_id = mongo_conector.get_user_id_wih_screenname(user)
+                    if user_id != None:
+                        ids = mongo_conector.get_tweet_ids_list_of_a_user_from_collection(user_id,mongo_conector.current_collection)
+                        for tweet_id in ids:
+                            pass
+                            # loop and refresh likes
+
             tweets_files_list = []
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
         else:

@@ -45,6 +45,11 @@ def get_tweet_ids_list_of_a_user_from_collection(user_id,collection="tweets"):
     tweets_id_list = [x["id_str"] for x in cursor_resultados if x["id_str"] not in special_doc_ids ]
     return tweets_id_list
 
+def get_user_id_wih_screenname(user_screen_name):
+    users_file = get_searched_users_file(current_collection)
+    user = users_file.get(user_screen_name,None)
+    return user.get("id_str",None)
+
 def get_tweets_cursor_from_mongo(collection="tweets"):
     print("[MONGO GET CURSOR INFO] Coleccion = {}".format(collection))
     return db[(collection or "tweets")].find({'_id': {'$nin': special_doc_ids }})
