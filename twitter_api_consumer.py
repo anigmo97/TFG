@@ -197,7 +197,7 @@ def collect_tweets_by_streamming_and_save_in_mongo(WORDS=["#python"],max_tweets=
         #REVISAR
         #streamer.filter(languages=["en","es"],async=True)
 
-def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,until_tweet_id=None):
+def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,until_tweet_id=None,partido=None):
     print("[ QUERY USER TO MONGO INFO ] Collectings tweets by user = '{}'".format(user_screen_name))
     #wait_on_rate_limit = True, wait_on_rate_limit_notify = True
     API = tweepy.API(auth)
@@ -225,7 +225,7 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
     tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
 
     user_id = API.get_user(screen_name = user_screen_name).id_str
-    mongo_conector.insert_or_update_searched_users_file(mongo_conector.current_collection,user_screen_name,user_id,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date)
+    mongo_conector.insert_or_update_searched_users_file(mongo_conector.current_collection,user_screen_name,user_id,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date,partido)
     return  tweets_sin_repetir
 
 def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):

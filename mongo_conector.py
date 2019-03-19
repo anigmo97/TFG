@@ -23,7 +23,7 @@ searched_users_file_id = "searched_users_file_id"
 likes_list_file_id = "likes_list_file_id"
 users_file_id = "users_file_id"
 
-special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id]
+special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,users_file_id]
 
 
 #additional_function_pattern = re.compile(".*\)\.(\w+)\(.*")
@@ -59,7 +59,6 @@ def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     cursor_resultados = db[collection].find({'_id': {'$in': tweet_ids_list}},{'_id':1})
     tweets_id_list = [x["_id"] for x in cursor_resultados]
     return tweets_id_list
-
 
 def get_keys_of_special_file_except_doc_id(special_doc):
     if special_doc !=None:
@@ -182,6 +181,12 @@ def get_streamming_file(collection):
 def get_searched_users_file(collection):
     return _get_special_file(collection,searched_users_file_id)
 
+def get_likes_list_file(collection):
+    return _get_special_file(collection,likes_list_file_id)
+
+def get_users_file(collection):
+    return _get_special_file(collection,users_file_id)
+
 
 ########################################################## INSERTS #########################################################
 
@@ -223,7 +228,7 @@ def update_common_management_special_doc_dict(dict_for_update,max_tweet_id,min_t
     return aux
 
 def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date,file_id,
-            query=None,words=None,words_comprobation=None,user=None,user_id=None):
+            query=None,words=None,words_comprobation=None,user=None,user_id=None,partido=None):
     
     print("[INSERT OR UPDATE SPECIAL FILE INFO]")
     if file_id not in special_doc_ids:
@@ -270,6 +275,7 @@ def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max
             aux = create_new_common_management_special_doc_dict(captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date,"tweets captured by user")
             aux["user"] = user
             aux["user_id"] = user_id
+            aux["partido"] = partido
             special_doc_dict[user]= aux
         else:
             print("[INSERT OR UPDATE {0} INFO] User is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
@@ -285,7 +291,7 @@ def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max
         print("[MONGO INSERT {0} INFO] The {0} has been save sucessfully".format(logs["upper_name"]))
     else:
         print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
-        db[collection].replace_one({"_id" : query_file_id },special_doc_dict)
+        db[collection].replace_one({"_id" : file_id },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
     
 
@@ -301,8 +307,101 @@ def insert_or_update_query_file_streamming(collection, words_list ,captured_twee
     
 
 
-def insert_or_update_searched_users_file(collection, user,user_id,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date):
+def insert_or_update_searched_users_file(collection, user,user_id,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date,partido):
     user= user.lower()
     _insert_or_update_special_file(collection=collection,captured_tweets=captured_tweets, min_tweet_id=min_tweet_id, max_tweet_id=max_tweet_id,min_creation_date = min_creation_date, max_creation_date=max_creation_date,
-     file_id=searched_users_file_id,user=user,user_id=user_id)
+     file_id=searched_users_file_id,user=user,user_id=user_id,partido=partido)
 
+
+def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS):
+
+    logs = get_log_dict_for_special_file_id(users_file_id)
+
+    special_doc_dict = _get_special_file(collection,users_file_id)
+
+    if special_doc_dict != None:
+        print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
+        nuevo_fichero = False
+    else:
+        print("[INSERT OR UPDATE {0} INFO] There is NO {0} in collection {1}".format(logs["upper_name"],collection))
+        nuevo_fichero =True
+        special_doc_dict = {"_id" : users_file_id}
+
+    if user_id not in special_doc_dict:
+        print("[INSERT OR UPDATE {0} INFO] Query is not in {0} (collection {1}), adding new entry ...".format(logs["upper_name"],collection))
+        aux = {}
+        aux["user_id"] = user_id
+        aux["user_screen_name"] = user_screen_name
+        aux["likes_to_PP"] = (likes_to_PP or 0)
+        aux["likes_to_PSOE"] = (likes_to_PSOE or 0)
+        aux["likes_to_PODEMOS"] = (likes_to_PODEMOS or 0)
+        aux["likes_to_CIUDADANOS"] = (likes_to_CIUDADANOS or 0)
+        aux["last_like_registered"] = str(datetime.now())
+        special_doc_dict[user_id]= aux
+    else:
+        print("[INSERT OR UPDATE {0} INFO] Query is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
+        aux = special_doc_dict[user_id]
+        aux["likes_to_PP"] = aux["likes_to_PP"] + (likes_to_PP or 0)
+        aux["likes_to_PSOE"] = aux["likes_to_PSOE"] + (likes_to_PSOE or 0)
+        aux["likes_to_PODEMOS"] = aux["likes_to_PODEMOS"] + (likes_to_PODEMOS or 0)
+        aux["likes_to_CIUDADANOS"] = aux["likes_to_CIUDADANOS"] + (likes_to_CIUDADANOS or 0)
+        aux["last_like_registered"] = str(datetime.now())
+        special_doc_dict[user_id] = aux
+
+
+    if nuevo_fichero:
+        print("[MONGO INSERT {0} INFO] Inserting new {0}".format(logs["upper_name"]))
+        db[collection].insert(special_doc_dict)
+        print("[MONGO INSERT {0} INFO] The {0} has been save sucessfully".format(logs["upper_name"]))
+    else:
+        print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
+        db[collection].replace_one({"_id" : users_file_id },special_doc_dict)
+        print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
+    
+
+
+
+def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_liked_list,author_id,author_screen_name):
+
+    logs = get_log_dict_for_special_file_id(likes_list_file_id)
+
+    special_doc_dict = _get_special_file(collection,likes_list_file_id)
+
+    if special_doc_dict != None:
+        print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
+        nuevo_fichero = False
+    else:
+        print("[INSERT OR UPDATE {0} INFO] There is NO {0} in collection {1}".format(logs["upper_name"],collection))
+        nuevo_fichero =True
+        special_doc_dict = {"_id" : likes_list_file_id}
+
+    if tweet_id not in special_doc_dict:
+        print("[INSERT OR UPDATE {0} INFO] Query is not in {0} (collection {1}), adding new entry ...".format(logs["upper_name"],collection))
+        aux = {}
+        aux["tweet_id"] = tweet_id
+        aux["user_id"] = author_id
+        aux["user_screen_name"] = author_screen_name
+        aux["users_who_liked"] = users_who_liked_list
+        aux["num_likes"] = num_likes
+        aux["last_like_resgistered"] = str(datetime.now())
+        special_doc_dict[tweet_id]= aux
+    else:
+        print("[INSERT OR UPDATE {0} INFO] Query is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
+        aux = special_doc_dict[tweet_id]
+        last_25_likes = aux["users_who_liked"][-25:]
+        last_25_ids = [x[0] for x in last_25_likes]
+        new_likes = [ x for x in users_who_liked_list if x[0] not in last_25_ids]
+        aux["users_who_liked"] = users_who_liked_list + new_likes
+        aux["num_likes"] = num_likes
+        aux["last_like_resgistered"] = str(datetime.now())
+        special_doc_dict[tweet_id] = aux
+
+
+    if nuevo_fichero:
+        print("[MONGO INSERT {0} INFO] Inserting new {0}".format(logs["upper_name"]))
+        db[collection].insert(special_doc_dict)
+        print("[MONGO INSERT {0} INFO] The {0} has been save sucessfully".format(logs["upper_name"]))
+    else:
+        print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
+        db[collection].replace_one({"_id" : likes_list_file_id },special_doc_dict)
+        print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))

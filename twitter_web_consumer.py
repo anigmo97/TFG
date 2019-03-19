@@ -15,7 +15,7 @@ except ImportError:
     from bs4 import BeautifulSoup
 import datetime
 
-
+driver = None
 
 def open_twitter_and_login():
 	driver = webdriver.Chrome(ChromeDriverManager().install())
@@ -34,8 +34,7 @@ def open_twitter_and_login():
 	return driver	
 
 
-def get_last_users_who_liked_a_tweet(screen_name, tweet_id):
-	driver = open_twitter_and_login()
+def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
 	try:
 		#chrome_options = Options()  
@@ -47,27 +46,31 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id):
 		print(e)
 		exit(1)
 	
-	boton_likes = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
-	boton_likes.click()
-	users_who_liked_section = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "ol[class='activity-popup-users dropdown-threshold']")))
-	divs_ultimos_likes = users_who_liked_section.find_elements_by_css_selector("div[class='account  js-actionable-user js-profile-popup-actionable ']")
-	
-	result_list = []
-	for div in divs_ultimos_likes:
-		user_id_str = div.get_attribute('data-user-id')
-		user_name = div.get_attribute('data-name')
-		user_nickname = div.get_attribute('data-screen-name')
-		result_list.append((user_id_str,user_name,user_nickname))
-		# aqui podría capturar la bio del usuario
+	try:
+		boton_likes = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
+		boton_likes.click()
+		users_who_liked_section = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "ol[class='activity-popup-users dropdown-threshold']")))
+		divs_ultimos_likes = users_who_liked_section.find_elements_by_css_selector("div[class='account  js-actionable-user js-profile-popup-actionable ']")
+		
+		result_list = []
+		for div in divs_ultimos_likes:
+			user_id_str = div.get_attribute('data-user-id')
+			user_name = div.get_attribute('data-name')
+			user_nickname = div.get_attribute('data-screen-name')
+			result_list.append((user_id_str,user_name,user_nickname))
+			# aqui podría capturar la bio del usuario
 
-	for e in range(len(result_list)):
-		print("{} {}".format(e+1,result_list[e]))
+		for e in range(len(result_list)):
+			print("{} {}".format(e+1,result_list[e]))
+	except Exception as e:
+		print("[get_twitter_user_rts_and_favs ERROR] There was an error")
+		print(e.__cause__)
 	
 	return result_list
 
 
-def get_tweets_of_a_user_until(screen_name,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):
-	driver = open_twitter_and_login()
+def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):
+
 	url = 'https://twitter.com/' + screen_name
 	
 	if date_limit != False:
@@ -185,8 +188,9 @@ def get_tweets_of_a_user_until(screen_name,date_limit=False,tweet_id_limit=False
 
 
 #returns list(retweet users),list(favorite users) for a given screen_name and status_id
-def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
-	driver = open_twitter_and_login()
+def get_twitter_user_rts_and_favs_v1(screen_name, status_id,driver):
+
+
 	url = urllib.request.urlopen('https://twitter.com/' + screen_name + '/status/' + status_id)
 	root = parse(url).getroot()
 
@@ -230,28 +234,29 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id):
 
 
 if __name__ == '__main__':
-	#driver = open_twitter_and_login()
+	driver = open_twitter_and_login()
 	#print(get_last_users_who_liked_a_tweet('Albert_Rivera', '1100705346291683328'))
 	
 	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL
 	#get_tweets_of_a_user_until("Albert_Rivera")
 	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL HASTA UN TWEET ID
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit=1100127150420754438)
+	
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit=1100127150420754438,driver=driver)
 	print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit="1100127150420754438")
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit="1100127150420754438",driver=driver)
 	print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=1551125726)
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=1551125726,driver=driver)
 	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit="25/02/2019")
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit="25/02/2019",driver=driver)
 	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=datetime.datetime(2019,2,25,0,0,0))
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=datetime.datetime(2019,2,25,0,0,0),driver=driver)
 	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",num_messages_limit=10)
+	limited_list = get_tweets_of_a_user_until("Albert_Rivera",num_messages_limit=10,driver=driver)
 	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
 	print(limited_list)
