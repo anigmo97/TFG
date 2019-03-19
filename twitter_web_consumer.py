@@ -48,6 +48,8 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 	
 	try:
 		boton_likes = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
+		num_likes = boton_likes.text
+		num_likes = num_likes.split()[0]
 		boton_likes.click()
 		users_who_liked_section = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "ol[class='activity-popup-users dropdown-threshold']")))
 		divs_ultimos_likes = users_who_liked_section.find_elements_by_css_selector("div[class='account  js-actionable-user js-profile-popup-actionable ']")
@@ -66,7 +68,7 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 		print("[get_twitter_user_rts_and_favs ERROR] There was an error")
 		print(e.__cause__)
 	
-	return result_list
+	return num_likes,result_list
 
 
 def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):

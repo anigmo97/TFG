@@ -345,6 +345,7 @@ if __name__ == "__main__":
     parser.add_argument("-mm","-MM","--max_messages",help="specify maximum num of messages to collect",type=int)
     parser.add_argument("-mt","-MT","--max_time",help="specify maximum time of collecting in minutes.This option has to be used in streamming",type=int)
     parser.add_argument("-p","-P","--partido",help="specify political party (only can be used with -qu option)",choices=["PP","pp","PSOE","psoe","Psoe","Podemos","podemos","PODEMOS","ciudadanos","cs","CIUDADANOS","CS","Ciudadanos"])
+    parser.add_argument("-l","-L","--loop",help="execute the action in loop",action="store_true")
 
     parser.add_argument("-c","-C","--collection",help="MongoDB collection to use",type=str)
     parser.add_argument("-cq", "-CQ","--collection_query",help="Execute querys registered in the query file of a collection",type=str)
@@ -379,14 +380,14 @@ if __name__ == "__main__":
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
         + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) == 1:
         if checkParameter(args.query): # -q option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -mt, -p o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) + checkParameter(args.loop)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -mt, -p, -l o -up")
         elif checkParameter(args.query_file): # -qf option
-            if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) + checkParameter(args.partido) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -qf no se pueden usar las opciones -w -mt -p o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) + checkParameter(args.partido) + checkParameter(args.loop)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -qf no se pueden usar las opciones -w -mt -p -l o -up")
         elif checkParameter(args.query_user): # -qu option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w o -mt o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.loop)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w o -mt -l o -up")
         elif checkParameter(args.collection_query): # -cq option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido)> 0:
                 throw_error(sys.modules[__name__],"Con la opción -cq no se pueden usar las opciones -w, -mt, -p o -up")
@@ -397,8 +398,8 @@ if __name__ == "__main__":
             if checkParameter(args.update) == 1:
                 throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
     else:
-        if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) + checkParameter(args.partido)>1:
-            throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones (-f, -d, -dd, -q, -qf, -s) no se pueden usar las opciones -w -mm -mt o -p")
+        if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) + checkParameter(args.partido) + checkParameter(args.loop)>1:
+            throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones (-f, -d, -dd, -q, -qf, -s) no se pueden usar las opciones -w -mm -mt -l o -p")
 
 ###################################################################################################################################################
 ###################################################################### FIN CHECK ERRORS ###########################################################
@@ -456,47 +457,53 @@ if __name__ == "__main__":
             # thread.join()
             # consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
         elif checkParameter(args.collection_query):
-            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
-            query_file = mongo_conector.get_query_file(mongo_conector.current_collection)
-            tweets_files_list = []
-            for query in mongo_conector.get_keys_of_special_file_except_doc_id(query_file):
-                element = query_file[query]
-                max_tweet_id = element["max_tweet_id"]
-                if checkParameter(args.max_messages) > 0:
-                    tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(max_tweets=args.max_messages,query=query,until_tweet_id=max_tweet_id)
-                else:
-                    tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(query=query,until_tweet_id=max_tweet_id)
-                analyze_tweets(tweets_files_list)
-                mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-            tweets_files_list = []
-        elif checkParameter(args.collection_users):
-            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
-            searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
-            users = searched_users_file.keys()
-            tweets_files_list = []
-            driver = twitter_web_consumer.open_twitter_and_login()
-            for user in users:
-                if user != "_id":
-                    max_tweet_id = searched_users_file[user]["max_tweet_id"]
-                    partido = searched_users_file[user]["partido"]
-                    likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS = get_likes_values(partido)
+            cond = True
+            while cond:
+                recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
+                query_file = mongo_conector.get_query_file(mongo_conector.current_collection)
+                tweets_files_list = []
+                for query in mongo_conector.get_keys_of_special_file_except_doc_id(query_file):
+                    element = query_file[query]
+                    max_tweet_id = element["max_tweet_id"]
                     if checkParameter(args.max_messages) > 0:
-                        tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(max_tweets=args.max_messages,user_screen_name=user,until_tweet_id=max_tweet_id)
+                        tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(max_tweets=args.max_messages,query=query,until_tweet_id=max_tweet_id)
                     else:
-                        tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
+                        tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(query=query,until_tweet_id=max_tweet_id)
                     analyze_tweets(tweets_files_list)
                     mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                    user_id = mongo_conector.get_user_id_wih_screenname(user)
-                    if user_id != None:
-                        ids = mongo_conector.get_tweet_ids_list_of_a_user_from_collection(user_id,mongo_conector.current_collection)
-                        for tweet_id in ids:
-                            users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                            # aqui podria consultar ongo para sacar el numero de likes o desde la web por ahora se deja None
-                            mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,None,users_who_liked,user_id,user)
-                            for u_id,u,u_screen in users_who_liked:
-                                mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS)
+                tweets_files_list = []
+                cond = args.loop
+        elif checkParameter(args.collection_users):
+            cond = True
+            driver = twitter_web_consumer.open_twitter_and_login()
+            while cond:
+                recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
+                searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+                users = searched_users_file.keys()
+                tweets_files_list = []
+                for user in users:
+                    if user != "_id":
+                        max_tweet_id = searched_users_file[user]["max_tweet_id"]
+                        partido = searched_users_file[user]["partido"]
+                        likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS = get_likes_values(partido)
+                        if checkParameter(args.max_messages) > 0:
+                            tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(max_tweets=args.max_messages,user_screen_name=user,until_tweet_id=max_tweet_id)
+                        else:
+                            tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
+                        analyze_tweets(tweets_files_list)
+                        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                        user_id = mongo_conector.get_user_id_wih_screenname(user)
+                        if user_id != None:
+                            ids = mongo_conector.get_tweet_ids_list_of_a_user_from_collection(user_id,mongo_conector.current_collection)
+                            for tweet_id in ids:
+                                num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
+                                # aqui podria consultar ongo para sacar el numero de likes o desde la web por ahora se deja None
+                                mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user)
+                                for u_id,u,u_screen in users_who_liked:
+                                    mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS)
 
-            tweets_files_list = []
+                tweets_files_list = []
+                cond = args.loop
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
         else:
             if checkParameter(args.update):
