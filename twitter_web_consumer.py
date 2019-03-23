@@ -9,6 +9,7 @@ import  urllib.request
 from threading import Thread
 from lxml.html import parse
 import time
+import pyperclip #pip3 install pyperclip   if error -> sudo apt install xsel
 try: 
     from BeautifulSoup import BeautifulSoup
 except ImportError:
@@ -188,6 +189,54 @@ def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limi
 	return (lista_tweets,lista_retweets)
 
 
+def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
+	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
+	try:
+		driver.get(url)	
+	except Exception as e:
+		print("[get_twitter_user_rts_and_favs ERROR] Error conecting")
+		print(e)
+		exit(1)
+	
+	try:
+		div_more = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='IconContainer js-tooltip']")))
+		div_more.click()
+		embed_tweet_li = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li[class='embed-link js-actionEmbedTweet']")))
+		embed_tweet_li.click()
+
+		print("antes de checkbox")
+		media_check_box = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-include-card']")))
+		print("despues de checkbox")
+
+	except Exception as e:
+		print("[get_twitter_user_rts_and_favs ERROR] There was an error ")
+		print(e.__cause__)
+	
+	try:
+		embed_html_text_element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-destination-wrapper']")))
+
+		#The element with the html for embed a tweet is not accesible so it's trickery time
+		accionador = webdriver.ActionChains(driver)
+		accionador.double_click(embed_html_text_element).perform()
+		driver.implicitly_wait(10)
+		accionador.send_keys(Keys.CONTROL + 'c').perform()
+
+		embed_with_media = pyperclip.paste()
+		media_check_box.click()
+		accionador.double_click(embed_html_text_element).perform()
+		driver.implicitly_wait(10)
+		accionador.send_keys(Keys.CONTROL + 'c').perform()
+		embed_without_media = pyperclip.paste()
+
+		print("embed_with_media {}".format(embed_with_media))
+
+		print("embed_without_media {}".format(embed_without_media))
+	except Exception as e:
+		print("[get_twitter_user_rts_and_favs ERROR] There was an error copying to the clipboard")
+		print(e.__cause__)
+
+	return embed_with_media,embed_without_media
+
 
 #returns list(retweet users),list(favorite users) for a given screen_name and status_id
 def get_twitter_user_rts_and_favs_v1(screen_name, status_id,driver):
@@ -243,24 +292,27 @@ if __name__ == '__main__':
 	#get_tweets_of_a_user_until("Albert_Rivera")
 	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL HASTA UN TWEET ID
 	
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit=1100127150420754438,driver=driver)
-	print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
+	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit=1100127150420754438,driver=driver)
+	# print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit="1100127150420754438",driver=driver)
-	print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
+	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit="1100127150420754438",driver=driver)
+	# print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=1551125726,driver=driver)
-	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=1551125726,driver=driver)
+	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit="25/02/2019",driver=driver)
-	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit="25/02/2019",driver=driver)
+	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=datetime.datetime(2019,2,25,0,0,0),driver=driver)
-	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=datetime.datetime(2019,2,25,0,0,0),driver=driver)
+	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	limited_list = get_tweets_of_a_user_until("Albert_Rivera",num_messages_limit=10,driver=driver)
-	print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
+	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",num_messages_limit=10,driver=driver)
+	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
 
-	print(limited_list)
+	# print(limited_list)
+
+
+	get_embed_html_of_a_tweet(screen_name="Albert_Rivera",tweet_id="1100127150420754438",driver=driver)
 
 	driver.close()
