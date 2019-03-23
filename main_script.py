@@ -206,6 +206,21 @@ def analyze_new_versions_of_tweets(current_tweet_dict_list):
             
     print("[ANALYZE NEW VERSIONS TWEETS INFO] Analysis finished sucessfully {} messages has been updated".format(num))    
 
+def get_users_screen_name_dict_of_tweet_ids_for_tops_in_variables(collection):
+    top_10_name_lists = [global_variables.global_most_favs_tweets,global_variables.global_most_rt_tweets,
+    global_variables.local_most_replied_tweets,global_variables.local_most_quoted_tweets]
+    tweet_id_list = []
+    for top_list in top_10_name_lists:
+        for e in top_list:
+            tweet_id_list.append(e[0])
+
+    return  mongo_conector.get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection)
+
+def update_tweets_owner_dict():
+    new_dict = get_users_screen_name_dict_of_tweet_ids_for_tops_in_variables(mongo_conector.current_collection)
+    for k,v in new_dict.items():
+        global_variables.tweets_owner_dict[k] = v 
+
 def analyze_tweets_from_filesystem(json_files_paths):
     for json_file in json_files_paths:
         current_tweet_dict_list = read_json_file(json_file)
@@ -292,9 +307,13 @@ def analyze_tweets(current_tweet_dict_list):
         fecha,hora,minuto = get_utc_time_particioned(current_tweet_dict["created_at"])
         insert_tweet_in_date_dict(tweet_id,fecha,hora,minuto)
 
+
+
         if len(tweets_ids_set) < insertions_in_set:
             print("[ANALYZE_TWEETS WARN] There are duplicates in the messages analyzed")
             input() 
+    
+    update_tweets_owner_dict()
 
     #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
@@ -371,7 +390,8 @@ if __name__ == "__main__":
     elif checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
         if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
         + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) + checkParameter(args.collection) \
-            + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) >0:
+            + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) \
+            + checkParameter(args.loop) + checkParameter(args.partido) + checkParameter(args.examples)>0:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
     # There is no filesystem options so we are going to check -s -q -qf -cq options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.query_user) \
@@ -380,20 +400,24 @@ if __name__ == "__main__":
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
         + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) == 1:
         if checkParameter(args.query): # -q option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) + checkParameter(args.loop)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -mt, -p, -l o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
+                + checkParameter(args.loop) + checkParameter(args.output_file)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -mt, -p, -l ,-up o -o")
         elif checkParameter(args.query_file): # -qf option
-            if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) + checkParameter(args.partido) + checkParameter(args.loop)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -qf no se pueden usar las opciones -w -mt -p -l o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) + checkParameter(args.partido) \
+                + checkParameter(args.loop) + checkParameter(args.examples) + checkParameter(args.collection)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -qf solo se pueden usar la opción -mm y -o")
         elif checkParameter(args.query_user): # -qu option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.loop)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w o -mt -l o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.loop) + checkParameter(args.output_file)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w o -mt -l, -up o -o")
         elif checkParameter(args.collection_query): # -cq option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -cq no se pueden usar las opciones -w, -mt, -p o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) +\
+                checkParameter(args.collection) > 0:
+                throw_error(sys.modules[__name__],"Con la opción -cq no se pueden usar las opciones -w, -mt, -p, -up o -c")
         elif checkParameter(args.collection_users): # -cu option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -cu no se pueden usar las opciones -w, -mt, -p o -up")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
+                + checkParameter(args.collection)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -cu no se pueden usar las opciones -w, -mt, -p, -up o -c")
         else: # -s option
             if checkParameter(args.update) == 1:
                 throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
@@ -406,7 +430,6 @@ if __name__ == "__main__":
 ###################################################################################################################################################
     
     print("\n\n[ MAIN INFO ] There is no errors in the command options ")
-
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
         json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)

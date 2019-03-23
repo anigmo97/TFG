@@ -1,6 +1,6 @@
 from pymongo import MongoClient,errors
 from bson.objectid import ObjectId
-from global_functions import change_dot_in_keys_for_bullet,change_bullet_in_keys_for_dot
+# from global_functions import change_dot_in_keys_for_bullet,change_bullet_in_keys_for_dot
 import traceback
 import json
 import ast # to load query string to dict
@@ -24,6 +24,40 @@ likes_list_file_id = "likes_list_file_id"
 users_file_id = "users_file_id"
 
 special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,users_file_id]
+
+
+##########################################################################################
+##################################### AUXILIAR ###########################################
+##########################################################################################
+def replace_bullet_with_dot(word):
+    return word.replace('•','.')
+
+def replace_dot_with_bullet(word):
+    return word.replace('.','•') 
+
+def change_dot_in_keys_for_bullet(dicctionary):
+    new_dict = {}
+    for k,v in dicctionary.items():
+        if "." in k:
+            print("[CHANGE DOT FOR BULLET INFO] Changing '.' in key {} for '•'".format(k))
+            new_key = replace_dot_with_bullet(k)
+            new_dict[new_key] = v
+        else:
+            new_dict[k] = v
+    return new_dict
+
+def change_bullet_in_keys_for_dot(dicctionary):
+    new_dict = {}
+    for k,v in dicctionary.items():
+        if "•" in k:
+            print("[CHANGE BULLET FOR DOT INFO] Changing '•' in key {} for '.'".format(k))
+            new_key = replace_bullet_with_dot(k)
+            new_dict[new_key] = v
+        else:
+            new_dict[k] = v
+    return new_dict
+
+
 
 
 #additional_function_pattern = re.compile(".*\)\.(\w+)\(.*")
@@ -66,7 +100,35 @@ def get_keys_of_special_file_except_doc_id(special_doc):
         del aux["_id"]
         return aux.keys()
     else:
-        return [] 
+        return []
+
+def get_collection_names():
+    return db.collection_names()
+
+
+def get_user_screen_name_of_tweet_id(tweet_id,collection):
+    cursor_resultados = db[collection].find({"_id": tweet_id})
+    return cursor_resultados[0]["user"]["screen_name"]
+
+def get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection):
+    cursor_resultados = db[collection].find({'_id': {'$in': tweet_id_list}},{'_id':1,'user.screen_name':1})
+    dict_tweet_user = {}
+    for e in cursor_resultados:
+        print(e)
+        dict_tweet_user[e["_id"]] = e["user"]["screen_name"]
+    print(dict_tweet_user)
+    return dict_tweet_user
+
+def get_users_screen_name_dict_of_tweet_ids_for_tops_in_statistics_file(statistics_file,collection):
+    top_10_name_lists = ["global_most_favs_tweets","global_most_rt_tweets","local_most_replied_tweets","local_most_quoted_tweets"]
+    tweet_id_list = []
+    for top_list in top_10_name_lists:
+        for e in statistics_file[top_list]:
+            tweet_id_list.append(e[0])
+
+    return  get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection)
+
+
 
 ##########################################################################################
 ##################################### UPDATE   ###########################################
@@ -131,7 +193,7 @@ def do_additional_actions_for_statistics_file(statistics_dict,collection):
         print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count=0 se recalcularán las estadísticas...")
         delete_statistics_file()
         return None
-    elif get_count_of_a_collection(collection) not in range(statistics_dict["messages_count"],statistics_dict["messages_count"]+len(special_doc_ids)):
+    elif get_count_of_a_collection(collection) not in range(statistics_dict["messages_count"],statistics_dict["messages_count"]+len(special_doc_ids)+1):
         print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count={} database_count={}".format(statistics_dict["messages_count"],get_count_of_a_collection(collection)))
         delete_statistics_file()
         return None
@@ -405,3 +467,5 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
         db[collection].replace_one({"_id" : likes_list_file_id },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
+
+print(get_collection_names())
