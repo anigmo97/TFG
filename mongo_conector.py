@@ -69,13 +69,13 @@ def get_count_of_a_collection(collection):
     return db[collection].count()
 
 def get_tweet_ids_list_from_database(collection="tweets"):
-    cursor_resultados = db[(collection or "tweets")].find({},{ "id_str": 1, "_id": 0 } )
-    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["id_str"] not in special_doc_ids ]
+    cursor_resultados = db[(collection or "tweets")].find({},{ "id_str": 1, "_id": 1 } )
+    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["_id"] not in special_doc_ids ]
     return tweets_id_list
 
 def get_tweet_ids_list_of_a_user_from_collection(user_id,collection="tweets"):
-    cursor_resultados = db[(collection or "tweets")].find({"user.id_str" : user_id},{ "id_str": 1, "_id": 0 } )
-    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["id_str"] not in special_doc_ids ]
+    cursor_resultados = db[(collection or "tweets")].find({"user.id_str" : user_id},{ "id_str": 1, "_id": 1 } )
+    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["_id"] not in special_doc_ids ]
     return tweets_id_list
 
 def get_user_id_wih_screenname(user_screen_name):
@@ -119,6 +119,30 @@ def get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection):
     print(dict_tweet_user)
     return dict_tweet_user
 
+def get_tweet_owner_dict_data_of_tweet_ids(tweet_id_list,collection):
+    cursor_resultados = db[collection].find({'_id': {'$in': tweet_id_list}},
+    {'_id':1,'user.screen_name':1,
+    'retweeted_status.user.id_str':1,'retweeted_status.user.screen_name':1,'retweeted_status.id_str':1,
+    'quoted_status.user.id_str':1,'quoted_status.user.screen_name':1,'quoted_status.id_str':1,'last_update':1})
+    dict_tweet_user = {}
+    for e in cursor_resultados:
+        print(e)
+        aux = {}
+        aux["user_screen_name"] = e["user"]["screen_name"]
+        aux["last_update"] = e["last_update"]
+        aux["is_retweet"] = bool(e.get("retweeted_status",False)) or False
+        if aux["is_retweet"]:
+            aux["retweeted_user_screen_name"] = e["retweeted_status"]["user"]["screen_name"]
+            aux["retweeted_tweet_id"] = e["retweeted_status"]["id_str"]
+        aux["is_quote"] = bool(e.get("quoted_status",False)) or False
+        if aux["is_quote"]:
+            aux["quoted_user_screen_name"] = e["quoted_status"]["user"]["screen_name"]
+            aux["quoted_tweet_id"] = e["quoted_status"]["id_str"]
+        dict_tweet_user[e["_id"]] = aux
+
+    print(dict_tweet_user)
+    return dict_tweet_user
+
 def get_users_screen_name_dict_of_tweet_ids_for_tops_in_statistics_file(statistics_file,collection):
     top_10_name_lists = ["global_most_favs_tweets","global_most_rt_tweets","local_most_replied_tweets","local_most_quoted_tweets"]
     tweet_id_list = []
@@ -138,8 +162,10 @@ def update_many_tweets_dicts_in_mongo(tweets_list,collection="tweets"):
     # replaceOne
     # update_one
     # db.tweets.update_many(tweets_list) hace falta un filter y un update tal vez se pueda hacer
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for tweet in tweets_list:
         tweet_id = tweet["id_str"]
+        tweet["last_update"] = now
         db[(collection or "tweets")].replace_one({"_id" : tweet_id },tweet)
 
 
@@ -160,6 +186,10 @@ def insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_ids_list,c
 
         tweets_no_repetidos = mongo_tweets_dict.values()
         if len(tweets_no_repetidos) >0:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            for e in tweets_no_repetidos:
+                e["first_capture"] = now
+                e["last_update"] = now
             db[(collection or "tweets")].insert_many(tweets_no_repetidos)
         if tweets_no_insertados > 0:
             print("[MONGO INSERT MANY WARN] {} messages weren't inserted because they were already in the collection {}".format(tweets_no_insertados,collection))
@@ -304,10 +334,12 @@ def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max
     if special_doc_dict != None:
         print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
         nuevo_fichero = False
+        special_doc_dict["total_captured_tweets"] = special_doc_dict["total_captured_tweets"] + captured_tweets
     else:
         print("[INSERT OR UPDATE {0} INFO] There is NO {0} in collection {1}".format(logs["upper_name"],collection))
         nuevo_fichero =True
         special_doc_dict = {"_id" : file_id}
+        special_doc_dict["total_captured_tweets"] = captured_tweets
 
     if file_id == query_file_id:
         if query not in special_doc_dict:
@@ -468,4 +500,4 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         db[collection].replace_one({"_id" : likes_list_file_id },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
 
-print(get_collection_names())
+

@@ -20,12 +20,21 @@ driver = None
 
 def open_twitter_and_login():
 	driver = webdriver.Chrome(ChromeDriverManager().install())
-	driver.get("https://twitter.com/login")
-	accionador = webdriver.ActionChains(driver)
-
-	username_text_field = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[class='js-username-field email-input js-initial-focus']")))
-	password_text_field = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[class='js-password-field']")))
 	
+	i=0
+	error=True
+	while i< 5 and error:
+		try:
+			driver.get("https://twitter.com/login")
+			accionador = webdriver.ActionChains(driver)
+
+			username_text_field = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[class='js-username-field email-input js-initial-focus']")))
+			password_text_field = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[class='js-password-field']")))
+			error=False
+			i+=1
+		except:
+			error = True
+
 	username_text_field.send_keys("")
 	driver.implicitly_wait(1)
 	password_text_field.send_keys("")
@@ -191,6 +200,7 @@ def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limi
 
 def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
+	print("[URL] {}".format(url))
 	try:
 		driver.get(url)	
 	except Exception as e:
@@ -201,39 +211,54 @@ def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
 	try:
 		div_more = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='IconContainer js-tooltip']")))
 		div_more.click()
+		print("[GET EMBED HTML] MORE dropdown button clicked")
 		embed_tweet_li = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li[class='embed-link js-actionEmbedTweet']")))
 		embed_tweet_li.click()
-
-		print("antes de checkbox")
-		media_check_box = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-include-card']")))
-		print("despues de checkbox")
+		print("[GET EMBED HTML] MORE embed button clicked")
 
 	except Exception as e:
 		print("[get_twitter_user_rts_and_favs ERROR] There was an error ")
 		print(e.__cause__)
+
+	try:
+		media_check_box = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-include-card']")))
+		has_media = True
+	except Exception as e:
+		has_media = False
+		print("[GET EMBED HTML] Tweet_url = {} does not contain media".format(url))
 	
 	try:
 		embed_html_text_element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-destination-wrapper']")))
-
 		#The element with the html for embed a tweet is not accesible so it's trickery time
 		accionador = webdriver.ActionChains(driver)
 		accionador.double_click(embed_html_text_element).perform()
 		driver.implicitly_wait(10)
-		accionador.send_keys(Keys.CONTROL + 'c').perform()
+		accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform() # do the same of control c
 
-		embed_with_media = pyperclip.paste()
-		media_check_box.click()
-		accionador.double_click(embed_html_text_element).perform()
-		driver.implicitly_wait(10)
-		accionador.send_keys(Keys.CONTROL + 'c').perform()
-		embed_without_media = pyperclip.paste()
 
-		print("embed_with_media {}".format(embed_with_media))
+		if has_media:
+			embed_with_media = pyperclip.paste()
+			media_check_box.click()
+			accionador.double_click(embed_html_text_element).perform()
+			driver.implicitly_wait(10)
+			accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform()
+			embed_without_media = pyperclip.paste()
+		else:
+			embed_without_media = pyperclip.paste()
+			embed_with_media = None
 
-		print("embed_without_media {}".format(embed_without_media))
+
+		# print("embed_with_media {}".format(embed_with_media))
+
+		# print("embed_without_media {}".format(embed_without_media))
 	except Exception as e:
 		print("[get_twitter_user_rts_and_favs ERROR] There was an error copying to the clipboard")
 		print(e.__cause__)
+
+	if embed_with_media != None:
+		embed_with_media = embed_with_media.replace("\"","'")
+	if embed_without_media != None:
+		embed_without_media = embed_without_media.replace("\"","'")
 
 	return embed_with_media,embed_without_media
 

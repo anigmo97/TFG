@@ -206,20 +206,47 @@ def analyze_new_versions_of_tweets(current_tweet_dict_list):
             
     print("[ANALYZE NEW VERSIONS TWEETS INFO] Analysis finished sucessfully {} messages has been updated".format(num))    
 
-def get_users_screen_name_dict_of_tweet_ids_for_tops_in_variables(collection):
+def get_tweets_ids_of_tops():
     top_10_name_lists = [global_variables.global_most_favs_tweets,global_variables.global_most_rt_tweets,
     global_variables.local_most_replied_tweets,global_variables.local_most_quoted_tweets]
     tweet_id_list = []
     for top_list in top_10_name_lists:
         for e in top_list:
             tweet_id_list.append(e[0])
+    return tweet_id_list
 
+def get_users_screen_name_dict_of_tweet_ids_for_tops_in_variables(collection):
+    tweet_id_list = get_tweets_ids_of_tops()
     return  mongo_conector.get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection)
 
+def get_owner_dict_data_of_tweet_ids_for_tops_in_variables(collection):
+    tweet_id_list = get_tweets_ids_of_tops()
+    return  mongo_conector.get_tweet_owner_dict_data_of_tweet_ids(tweet_id_list,collection)
+    
+
 def update_tweets_owner_dict():
-    new_dict = get_users_screen_name_dict_of_tweet_ids_for_tops_in_variables(mongo_conector.current_collection)
+    new_dict = get_owner_dict_data_of_tweet_ids_for_tops_in_variables(mongo_conector.current_collection)
     for k,v in new_dict.items():
-        global_variables.tweets_owner_dict[k] = v 
+        global_variables.tweets_owner_dict[k] = v
+
+def build_embed_top_tweets_dict():
+    tweet_id_list = get_tweets_ids_of_tops()
+    driver = twitter_web_consumer.open_twitter_and_login()
+    for tweet_id in tweet_id_list:
+        if tweet_id != 0 and not global_variables.tweets_embed_html_dict.get(tweet_id,False):
+            print("ENTRA")
+            registry_dict = global_variables.tweets_owner_dict.get(tweet_id,None)
+            
+
+            if registry_dict == None: # guardar los tweets respondidos y citados en owner_dict
+                print("[REVISAR] tweet_id = {}".format(tweet_id))
+            else:
+                user_screen_name = registry_dict["user_screen_name"]
+                embed_with_media,embed_without_media = twitter_web_consumer.get_embed_html_of_a_tweet(user_screen_name,tweet_id,driver)
+                aux = { "embed_with_media" : embed_with_media , "embed_without_media" : embed_without_media}
+                global_variables.tweets_embed_html_dict[tweet_id] = aux
+    driver.close()
+
 
 def analyze_tweets_from_filesystem(json_files_paths):
     for json_file in json_files_paths:
@@ -314,6 +341,7 @@ def analyze_tweets(current_tweet_dict_list):
             input() 
     
     update_tweets_owner_dict()
+    build_embed_top_tweets_dict()
 
     #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
