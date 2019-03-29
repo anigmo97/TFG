@@ -382,17 +382,19 @@ if __name__ == "__main__":
 
     parser.add_argument("-o","-O","--output_file",help="choose name for file with results", type=str)
 
-    parser.add_argument("-up","-UP","--update",help="update your tweets in mongoDb before calculate stadistics",action='store_true')
-    parser.add_argument("-s","-S","--streamming",help="get tweets from twitter API by streamming save it in mongoDb and then analyzes them",action='store_true')
-    parser.add_argument("-q","-Q","--query",help="get tweets from twitter API by query save it in mongoDb and then analyzes them", type=str)
-    parser.add_argument("-qu","-QU","-uq","--query_user",nargs='+',help="get tweets from twitter API by user save it in mongoDb and then analyzes them", type=str)
-    parser.add_argument("-qf","-QF","--query_file",help="get tweets from twitter API by query save it in a file and then analyzes them", type=str)
+    parser.add_argument("-a","-A","--analyze",help="analyze tweets and calculate stadistics",action='store_true')
+    parser.add_argument("-up","-UP","--update",help="update your tweets in mongoDb",action='store_true')
+    parser.add_argument("-s","-S","--streamming",help="get tweets from twitter API by streamming save it in mongoDb",action='store_true')
+    parser.add_argument("-q","-Q","--query",help="get tweets from twitter API by query save it in mongoDb", type=str)
+    parser.add_argument("-qu","-QU","-uq","--query_user",nargs='+',help="get tweets from twitter API by user save it in mongoDb", type=str)
+    parser.add_argument("-qf","-QF","--query_file",help="get tweets from twitter API by query save it in a file", type=str)
 
     parser.add_argument("-w","-W","--words",nargs='+',help="specify words that should be used in the collected tweets.This option has to be used in streamming",type=str)
     parser.add_argument("-mm","-MM","--max_messages",help="specify maximum num of messages to collect",type=int)
     parser.add_argument("-mt","-MT","--max_time",help="specify maximum time of collecting in minutes.This option has to be used in streamming",type=int)
     parser.add_argument("-p","-P","--partido",help="specify political party (only can be used with -qu option)",choices=["PP","pp","PSOE","psoe","Psoe","Podemos","podemos","PODEMOS","ciudadanos","cs","CIUDADANOS","CS","Ciudadanos"])
     parser.add_argument("-l","-L","--loop",help="execute the action in loop",action="store_true")
+    parser.add_argument("-t","-T","--analysis_trunk",help="trunk to use in analysis to not overload data",type=int)
 
     parser.add_argument("-c","-C","--collection",help="MongoDB collection to use",type=str)
     parser.add_argument("-cq", "-CQ","--collection_query",help="Execute querys registered in the query file of a collection",type=str)
@@ -419,33 +421,39 @@ if __name__ == "__main__":
         if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
         + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) + checkParameter(args.collection) \
             + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) \
-            + checkParameter(args.loop) + checkParameter(args.partido) + checkParameter(args.examples)>0:
+            + checkParameter(args.loop) + checkParameter(args.partido) + checkParameter(args.examples)>0 + checkParameter(args.analyze)\
+                +checkParameter(args.analysis_trunk)>0:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
     # There is no filesystem options so we are going to check -s -q -qf -cq options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.query_user) \
-        + checkParameter(args.collection_query) + checkParameter(args.collection_users) > 1:
-        throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' -qf -qu -cu o -cq de forma simultanea ")
+        + checkParameter(args.collection_query) + checkParameter(args.collection_users) + checkParameter(args.analyze)> 1:
+        throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' -a -qf -qu -cu o -cq de forma simultanea ")
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
-        + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) == 1:
+        + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) + checkParameter(args.analyze) == 1:
         if checkParameter(args.query): # -q option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
-                + checkParameter(args.loop) + checkParameter(args.output_file)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -mt, -p, -l ,-up o -o")
+                + checkParameter(args.loop) + checkParameter(args.output_file) +checkParameter(args.analysis_trunk)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -mt, -p, -t -l ,-up o -o")
         elif checkParameter(args.query_file): # -qf option
             if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) + checkParameter(args.partido) \
-                + checkParameter(args.loop) + checkParameter(args.examples) + checkParameter(args.collection)> 0:
+                + checkParameter(args.loop) + checkParameter(args.examples) + checkParameter(args.collection) +checkParameter(args.analysis_trunk)> 0:
                 throw_error(sys.modules[__name__],"Con la opción -qf solo se pueden usar la opción -mm y -o")
         elif checkParameter(args.query_user): # -qu option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.loop) + checkParameter(args.output_file)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w o -mt -l, -up o -o")
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.loop) \
+                + checkParameter(args.output_file) +checkParameter(args.analysis_trunk)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w ,-mt, -t, -l, -up o -o")
+        elif checkParameter(args.analyze):
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.output_file) +\
+                + checkParameter(args.partido) +checkParameter(args.max_messages)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -a no se pueden usar las opciones -w -p -mm -mt -up -mm o -o")
         elif checkParameter(args.collection_query): # -cq option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) +\
-                checkParameter(args.collection) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -cq no se pueden usar las opciones -w, -mt, -p, -up o -c")
+                checkParameter(args.collection) +checkParameter(args.analysis_trunk)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -cq no se pueden usar las opciones -w, -mt, -p, -t, -up o -c")
         elif checkParameter(args.collection_users): # -cu option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
-                + checkParameter(args.collection)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -cu no se pueden usar las opciones -w, -mt, -p, -up o -c")
+                + checkParameter(args.collection) + checkParameter(args.analysis_trunk)> 0:
+                throw_error(sys.modules[__name__],"Con la opción -cu no se pueden usar las opciones -w, -mt, -t -p, -up o -c")
         else: # -s option
             if checkParameter(args.update) == 1:
                 throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
@@ -463,54 +471,69 @@ if __name__ == "__main__":
         json_files_path_list = retrieveTweetsFromFileSystem(args.file,args.directory,args.directory_of_directories)
         fileSystemMode = True
     else:
-        if checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + \
-            checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) >= 1 :
-            print("[ MAIN INFO ] The working collection is {}".format(mongo_conector.current_collection))
-            statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
-            if statistics_file == None:
-                if mongo_conector.get_count_of_a_collection(mongo_conector.current_collection) > 0:
-                    print("[MAIN INFO] No hay fichero de estadísticas para la colección {} pero la coleccion tiene registros por lo que se generará uno analizando en primer lugar los tweets de la coleccion".format(mongo_conector.current_collection))
-                    recalculate_statistics = True
-                else:
-                    print("[MAIN INFO] No hay fichero de estadísticas para la colección {} y la coleccion no tiene datos, se generará un fichero nuevo con los nuevos mensajes que se recopilen".format(mongo_conector.current_collection))
-                    recalculate_statistics = False
-            else:
-                global_variables.set_statistics_from_statistics_dict(statistics_file)
-    
         if checkParameter(args.query): # -q option
-            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
-            args.query= put_hashtag_in_query(args.query)
             tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(args.max_messages or 3000,args.query or "#python")
+
         elif checkParameter(args.query_file): # -qf option
             create_dir_if_not_exits("tweets")
-            args.query_file= put_hashtag_in_query(args.query_file)
             tweets_files_list = consumer.collect_tweets_by_query_and_save_in_file(args.max_messages or 3000,args.query_file or "#python")
+
         elif checkParameter(args.query_user): # -qu option
-            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
-            # @ ? args.query_user= put_hashtag_in_query(args.query)
             if checkParameter(args.partido) > 0:
                 args.partido = args.partido.upper()
                 if args.partido =="CS":
                     args.partido = "CIUDADANOS"
             for screen_name in args.query_user:
                 tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=screen_name,max_tweets =(args.max_messages or 3000),partido=args.partido)
-                analyze_tweets(tweets_files_list)
-                mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-            tweets_files_list = []
 
-        elif checkParameter(args.streamming):
-            recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
+        elif checkParameter(args.streamming): # -s option
             argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
             consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
-            # thread = Thread(target = consumer.collect_tweets_by_streamming_and_save_in_mongo, args = argumentos_funcion)
-            # exist_thread = True
-            # thread.start()
-            # thread.join()
-            # consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
-        elif checkParameter(args.collection_query):
+
+        elif checkParameter(args.analyze):
+            statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
+            if statistics_file != None:
+                global_variables.set_statistics_from_statistics_dict(statistics_file)
+            cursor_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection)
+            trunk = args.analysis_trunk or 500
+            cond = True
+            lista_tweets_nuevos = []
+            lista_tweets_actualizados =[]
+            while cond:
+                for tweet in cursor_tweets:
+                    print(json.dumps(tweet,indent=4,sort_keys=True))
+                    print(tweet["_id"])
+                    if tweet["analyzed"] == False:
+                        lista_tweets_nuevos.append(tweet)
+                    else:
+                        lista_tweets_actualizados.append(tweet)
+                    if len(lista_tweets_nuevos) >= trunk:
+                        analyze_tweets(lista_tweets_nuevos)
+                        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                        mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
+                        lista_tweets_nuevos = []
+                    if len(lista_tweets_actualizados) >= trunk:
+                        analyze_new_versions_of_tweets(lista_tweets_actualizados)
+                        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                        mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
+                        lista_tweets_actualizados =[]
+                
+                if len(lista_tweets_nuevos) >= trunk:
+                    analyze_tweets(lista_tweets_nuevos)
+                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                    mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
+                    lista_tweets_nuevos = []
+                if len(lista_tweets_actualizados) >= trunk:
+                    analyze_new_versions_of_tweets(lista_tweets_actualizados)
+                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+                    mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
+                    lista_tweets_actualizados =[]
+                cond = args.loop
+            
+
+        elif checkParameter(args.collection_query): # -cq option
             cond = True
             while cond:
-                recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
                 query_file = mongo_conector.get_query_file(mongo_conector.current_collection)
                 tweets_files_list = []
                 for query in mongo_conector.get_keys_of_special_file_except_doc_id(query_file):
@@ -520,15 +543,12 @@ if __name__ == "__main__":
                         tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(max_tweets=args.max_messages,query=query,until_tweet_id=max_tweet_id)
                     else:
                         tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(query=query,until_tweet_id=max_tweet_id)
-                    analyze_tweets(tweets_files_list)
-                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                tweets_files_list = []
                 cond = args.loop
-        elif checkParameter(args.collection_users):
+
+        elif checkParameter(args.collection_users): # -cu option
             cond = True
             driver = twitter_web_consumer.open_twitter_and_login()
             while cond:
-                recalculate_statistics_for_collection_if_is_necessary(recalculate_statistics,statistics_file,mongo_conector.current_collection)
                 searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
                 users = searched_users_file.keys()
                 tweets_files_list = []
@@ -541,25 +561,22 @@ if __name__ == "__main__":
                             tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(max_tweets=args.max_messages,user_screen_name=user,until_tweet_id=max_tweet_id)
                         else:
                             tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
-                        analyze_tweets(tweets_files_list)
-                        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
                         user_id = mongo_conector.get_user_id_wih_screenname(user)
                         if user_id != None:
                             ids = mongo_conector.get_tweet_ids_list_of_a_user_from_collection(user_id,mongo_conector.current_collection)
                             for tweet_id in ids:
                                 num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                                # aqui podria consultar ongo para sacar el numero de likes o desde la web por ahora se deja None
                                 mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user)
                                 for u_id,u,u_screen in users_who_liked:
                                     mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS)
 
-                tweets_files_list = []
                 cond = args.loop
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
         else:
             if checkParameter(args.update):
                 tweets_ids = mongo_conector.get_tweet_ids_list_from_database(mongo_conector.current_collection)
                 consumer.get_specifics_tweets_from_api_and_update_mongo(tweets_ids)
+                # marcar los ficheros actualizados con analized: to update 
                 # si no hay fichero no hago nada pero si hay tengo k ir actualizando las estadisticas de los tweets analizados
             tweets_files_list = mongo_conector.get_tweets_cursor_from_mongo(mongo_conector.current_collection)
 
@@ -567,10 +584,6 @@ if __name__ == "__main__":
 
     if fileSystemMode:
         analyze_tweets_from_filesystem(json_files_path_list)
-    else:
-        if not checkParameter(args.streamming): # streamming los analiza e inserta sobre la marcha
-            analyze_tweets(tweets_files_list)
-            mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
 
     
 

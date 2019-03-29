@@ -84,6 +84,23 @@ def get_user_id_wih_screenname(user_screen_name):
     print("[GET USER_ID WITH SCREEN NAME INFO] user = {}".format(json.dumps(user,indent=4)))
     return user.get("user_id",None)
 
+def get_users_of_a_political_party(political_party,collection):
+    ["PP","pp","PSOE","psoe","Psoe","Podemos","podemos","PODEMOS","ciudadanos","cs","CIUDADANOS","CS","Ciudadanos"]
+    political_party = political_party.upper()
+    if political_party=="CS":
+        political_party="CIUDADANOS"
+    searched_users_file = get_searched_users_file(collection)
+    politics = []
+    if searched_users_file != None:
+        for k,v in searched_users_file.items():
+            if k != "_id" and k!="total_captured_tweets":
+                if v["partido"] == political_party:
+                    politics.append(k)
+
+    return politics
+
+    
+
 def get_tweets_cursor_from_mongo(collection="tweets"):
     print("[MONGO GET CURSOR INFO] Coleccion = {}".format(collection))
     return db[(collection or "tweets")].find({'_id': {'$nin': special_doc_ids }})
@@ -118,6 +135,10 @@ def get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection):
         dict_tweet_user[e["_id"]] = e["user"]["screen_name"]
     print(dict_tweet_user)
     return dict_tweet_user
+
+def get_tweets_to_analyze_or_update_stats(collection):
+    return db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids }})
+
 
 def get_tweet_owner_dict_data_of_tweet_ids(tweet_id_list,collection):
     cursor_resultados = db[collection].find({'_id': {'$in': tweet_id_list}},
@@ -214,19 +235,19 @@ def insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_ids_list,c
 ##########################################################################################
 
 def do_additional_actions_for_statistics_file(statistics_dict,collection):
-    def delete_statistics_file():
-        print("[MONGO STATISTICS WARN] Deleting statistics file")
-        db[collection].remove({"_id":statistics_file_id})
-        print("[MONGO STATISTICS WARN] Statistics file has been deleted")
+    # def delete_statistics_file():
+    #     print("[MONGO STATISTICS WARN] Deleting statistics file")
+    #     db[collection].remove({"_id":statistics_file_id})
+    #     print("[MONGO STATISTICS WARN] Statistics file has been deleted")
 
-    if statistics_dict["messages_count"]==0:
-        print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count=0 se recalcularán las estadísticas...")
-        delete_statistics_file()
-        return None
-    elif get_count_of_a_collection(collection) not in range(statistics_dict["messages_count"],statistics_dict["messages_count"]+len(special_doc_ids)+1):
-        print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count={} database_count={}".format(statistics_dict["messages_count"],get_count_of_a_collection(collection)))
-        delete_statistics_file()
-        return None
+    # if statistics_dict["messages_count"]==0:
+    #     print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count=0 se recalcularán las estadísticas...")
+    #     delete_statistics_file()
+    #     return None
+    # elif get_count_of_a_collection(collection) not in range(statistics_dict["messages_count"],statistics_dict["messages_count"]+len(special_doc_ids)+1):
+    #     print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count={} database_count={}".format(statistics_dict["messages_count"],get_count_of_a_collection(collection)))
+    #     delete_statistics_file()
+    #     return None
 
     way_of_send_with_keys_with_dots =  change_bullet_in_keys_for_dot(statistics_dict["way_of_send_counter"])
     statistics_dict["way_of_send_counter"] = way_of_send_with_keys_with_dots
@@ -500,4 +521,7 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         db[collection].replace_one({"_id" : likes_list_file_id },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
 
+def mark_docs_as_analyzed(docs_ids,collection):
+    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":True}})
 
+print(get_users_of_a_political_party("CS","test2"))

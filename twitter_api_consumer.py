@@ -157,6 +157,7 @@ def collect_tweets_by_query_and_save_in_mongo(max_tweets=3000,query="#science",f
                 if until_tweet_id != None and tweet_id < until_tweet_id:
                     break
                 tweet["_id"]= tweet_id
+                tweet["analyzed"] = False  
                 mongo_tweets_id_list.append(tweet_id)
                 mongo_tweets_dict[tweet_id] = tweet
         
@@ -212,6 +213,7 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
                 print("\n\nbreak\n\n")
                 break
             tweet["_id"]= tweet_id
+            tweet["analyzed"] = False
             mongo_tweets_id_list.append(tweet_id)
             mongo_tweets_dict[tweet_id] = tweet
 
@@ -264,6 +266,7 @@ def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
                 print("limite alcanzado")
             else:
                 tweet_dict["_id"] = tweet_dict["id_str"]
+                tweet["analyzed"] = False
                 new_version_of_tweets.append(tweet_dict)
                 updated_tweets_count += 1
             x+=1
@@ -285,6 +288,7 @@ def get_mongo_document(json_tweet):
         tweet_dict = json.loads(json_tweet)
         tweet_id = tweet_dict["id_str"]
         tweet_dict["_id"]= tweet_id
+        tweet_dict["analyzed"] = False
     except Exception:
         print("[GET MONGO DOCUMENT ERROR] {} ".format(json.dumps(tweet_dict,indent=4, sort_keys=True)))
         return None
