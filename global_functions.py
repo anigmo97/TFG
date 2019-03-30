@@ -42,7 +42,14 @@ def update_top_10_list(lista,tuple_id_amount,show=False):
 
 def notNone(value):
     return value != None
-    
+
+def get_string_datetime_now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def get_string_datetime_with_n_min_more_than_now(mins_to_add):
+    now_plus_mins = datetime.now() + timedelta(minutes=mins_to_add)
+    return now_plus_mins.strftime("%Y-%m-%d %H:%M:%S")
+
 def checkParameter(parameter):
     if parameter == None or parameter == False:
         return 0
@@ -232,5 +239,4 @@ def print_all_top_ten_lists():
 
     #print_top_10_list(global_variables.local_most_favs_users,"")
     #print_top_10_list(global_variables.local_most_followers_users,"usuarios de los cuales tenemos mas followers")
-
 

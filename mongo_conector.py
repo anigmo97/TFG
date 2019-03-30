@@ -1,4 +1,4 @@
-from pymongo import MongoClient,errors
+from pymongo import MongoClient,errors,ASCENDING,DESCENDING
 from bson.objectid import ObjectId
 # from global_functions import change_dot_in_keys_for_bullet,change_bullet_in_keys_for_dot
 import traceback
@@ -135,6 +135,13 @@ def get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection):
         dict_tweet_user[e["_id"]] = e["user"]["screen_name"]
     print(dict_tweet_user)
     return dict_tweet_user
+
+def get_last_n_tweets_of_a_user_in_a_collection(user_id,collection,num_tweets):
+    cursor_tweets_id = db[collection].find({"user.id_str": user_id},{"_id":1}).sort("_id",DESCENDING).limit(num_tweets)
+    lista_tweets_id = [x["_id"] for x in cursor_tweets_id]
+    lista_tweets_id.reverse()
+    return lista_tweets_id
+
 
 def get_tweets_to_analyze_or_update_stats(collection,limit=0):
     lista_tweets = list(db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids }}).limit(limit))
@@ -505,6 +512,7 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         aux["user_screen_name"] = author_screen_name
         aux["users_who_liked"] = users_who_liked_list
         aux["num_likes"] = num_likes
+        new_likes = users_who_liked_list
         aux["last_like_resgistered"] = str(datetime.now())
         special_doc_dict[tweet_id]= aux
     else:
@@ -527,6 +535,8 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
         db[collection].replace_one({"_id" : likes_list_file_id },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
+
+    return new_likes
 
 def mark_docs_as_analyzed(docs_ids,collection):
     print("[mark_docs_as_analyzed] marking as analyzed {} tweets".format(len(docs_ids)))
