@@ -277,8 +277,8 @@ def initialize_likes_queue(users,collection,initial_messages,likes_ratio):
             user_registry["tweet_queue"] = tweet_queue
             likes_queue_dict[user] = user_registry
     
-    print(likes_queue_dict)
-    input()
+    # print(likes_queue_dict)
+    # input()
     return likes_queue_dict
 
 
@@ -372,7 +372,7 @@ def analyze_tweets(current_tweet_dict_list):
 
         if len(tweets_ids_set) < insertions_in_set:
             print("[ANALYZE_TWEETS WARN] There are duplicates in the messages analyzed")
-            input() 
+            # input() 
     
 
     #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
@@ -401,6 +401,15 @@ def analyze_tweets_and_mark_in_mongo(cursor_tweets):
         mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_actualizados],mongo_conector.current_collection)
         lista_tweets_actualizados =[]
 
+def put_additional_doc_in_mongo_with_tweets_ids_of_searched_users_not_captured_yet(searched_users_file,collection):
+    aux = {"_id" : mongo_conector.tweet_of_searched_users_not_captured_yet_file_id}
+    for x in searched_users_file.keys():
+        if x not in ("_id","total_captured_tweets"):
+            driver_aux = twitter_web_consumer.open_twitter_and_login()
+            lista_tweets_ids,lista_retweets_ids = twitter_web_consumer.get_tweets_of_a_user_until(x,driver_aux,tweet_id_limit=searched_users_file[x]["max_tweet_id"])
+            aux[x] = lista_retweets_ids + lista_tweets_ids
+    mongo_conector.insert_tweet_of_searched_users_not_captured_yet_file(aux,collection)
+    driver_aux.close()
 
 def put_hashtag_in_query(query):
     if not query.startswith("#"):
@@ -615,6 +624,7 @@ if __name__ == "__main__":
 
         elif checkParameter(args.likes): # --likes option
             cond = True
+            mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
             driver = twitter_web_consumer.open_twitter_and_login()
             searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
             users = searched_users_file.keys()
@@ -633,6 +643,12 @@ if __name__ == "__main__":
                                 if tweet_id > likes_queue_of_user[-1] and tweet_id not in likes_queue[user]:
                                     likes_queue_of_user.append(tweet_id)
                                     likes_queue[user][tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
+                            additional_ids_file = mongo_conector.get_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection)
+                            if additional_ids_file != None:
+                                for tweet_id in additional_ids_file:
+                                    if tweet_id > likes_queue_of_user[-1] and tweet_id not in likes_queue[user]:
+                                        likes_queue_of_user.append(tweet_id)
+                                        likes_queue[user][tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
                             likes_queue[user]["tweet_queue"] = likes_queue_of_user
 
                             tweet_queue_aux= []
@@ -655,6 +671,10 @@ if __name__ == "__main__":
                 searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
                 users = searched_users_file.keys()
                 cond = args.loop
+                if cond:
+                    thread = Thread(target=put_additional_doc_in_mongo_with_tweets_ids_of_searched_users_not_captured_yet, args=(searched_users_file,mongo_conector.current_collection,))
+                    thread.start()
+                    #thread.run()
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
         else:
             if checkParameter(args.update):

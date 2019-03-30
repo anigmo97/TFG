@@ -46,6 +46,8 @@ def open_twitter_and_login():
 
 def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
+	num_likes = 0
+	result_list = []
 	try:
 		#chrome_options = Options()  
 		#chrome_options.add_argument("--headless")
@@ -297,7 +299,7 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id,driver):
                     #apparently, favs are listed before retweets, but the retweet summary's listed before the fav summary
                     #if in doubt you can take the difference of returned uids here with retweet uids from the official api
 					[print(e) for e in users]
-					input()
+					# input()
 					if num_favs > 0:#num_rt > 0:
                         #num_rts -= 1
 						num_favs -= 1

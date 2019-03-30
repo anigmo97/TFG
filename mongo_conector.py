@@ -22,8 +22,9 @@ streamming_file_id = "streamming_file_id"
 searched_users_file_id = "searched_users_file_id"
 likes_list_file_id = "likes_list_file_id"
 users_file_id = "users_file_id"
+tweet_of_searched_users_not_captured_yet_file_id = "tweet_of_searched_users_not_captured_yet_file_id" # it's created in likes process in loop
 
-special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,users_file_id]
+special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,users_file_id,tweet_of_searched_users_not_captured_yet_file_id]
 
 
 ##########################################################################################
@@ -269,7 +270,8 @@ def get_log_dict_for_special_file_id(file_id):
         streamming_file_id : { "upper_name" : "STREAMMING_FILE", "file_aux" :"Fichero de busquedas por streamming" , "file_id" : streamming_file_id },
         searched_users_file_id : { "upper_name" : "SEARCHED_USERS_FILE", "file_aux" :"Fichero de usuarios buscados" , "file_id" : searched_users_file_id },
         users_file_id : { "upper_name" : "USERS_FILE", "file_aux" :"Fichero de usuarios" , "file_id" : users_file_id },
-        likes_list_file_id : { "upper_name" : "LIKES_FILE", "file_aux" :"Fichero de likes" , "file_id" : likes_list_file_id }
+        likes_list_file_id : { "upper_name" : "LIKES_FILE", "file_aux" :"Fichero de likes" , "file_id" : likes_list_file_id },
+        tweet_of_searched_users_not_captured_yet_file_id : { "upper_name" : "TWEETS_IDS_OF_SEARCHED_USER_NOT_CAPTURED_YET_FILE", "file_aux" :"Fichero de tweets id de usuarios buscados no capturados todavía" , "file_id" : tweet_of_searched_users_not_captured_yet_file_id }
         
     }
     return aux.get(file_id,None)
@@ -294,6 +296,9 @@ def _get_special_file(collection,file_id):
 def get_statistics_file_from_collection(collection):
     return _get_special_file(collection,statistics_file_id)
 
+def get_tweet_of_searched_users_not_captured_yet_file(collection):
+    return _get_special_file(collection,tweet_of_searched_users_not_captured_yet_file_id)
+
 def get_query_file(collection):
     return _get_special_file(collection,query_file_id)
 
@@ -309,6 +314,9 @@ def get_likes_list_file(collection):
 def get_users_file(collection):
     return _get_special_file(collection,users_file_id)
 
+
+def delete_tweet_of_searched_users_not_captured_yet_file(collection):
+    db[collection].remove({"_id":tweet_of_searched_users_not_captured_yet_file_id})
 
 ########################################################## INSERTS #########################################################
 
@@ -489,6 +497,12 @@ def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP
     
 
 
+
+def insert_tweet_of_searched_users_not_captured_yet_file(special_doc_dict,collection):
+    try:
+        db[collection].insert({"_id" : tweet_of_searched_users_not_captured_yet_file_id },special_doc_dict,upsert=True)
+    except:
+        db[collection].replace_one({"_id" : tweet_of_searched_users_not_captured_yet_file_id },special_doc_dict,upsert=True)
 
 def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_liked_list,author_id,author_screen_name):
 
