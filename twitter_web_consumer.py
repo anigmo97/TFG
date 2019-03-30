@@ -201,6 +201,7 @@ def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limi
 def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
 	print("[URL] {}".format(url))
+	error = False
 	try:
 		driver.get(url)	
 	except Exception as e:
@@ -219,48 +220,52 @@ def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
 	except Exception as e:
 		print("[get_twitter_user_rts_and_favs ERROR] There was an error ")
 		print(e.__cause__)
+		print("[get_twitter_user_rts_and_favs ERROR] {} embed won't be get (possibly was deleted fro Twitter)".format(tweet_id))
+		error = True
 
-	try:
-		media_check_box = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-include-card']")))
-		has_media = True
-	except Exception as e:
-		has_media = False
-		print("[GET EMBED HTML] Tweet_url = {} does not contain media".format(url))
-	
-	try:
-		embed_html_text_element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-destination-wrapper']")))
-		#The element with the html for embed a tweet is not accesible so it's trickery time
-		accionador = webdriver.ActionChains(driver)
-		accionador.double_click(embed_html_text_element).perform()
-		driver.implicitly_wait(10)
-		accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform() # do the same of control c
-
-
-		if has_media:
-			embed_with_media = pyperclip.paste()
-			media_check_box.click()
+	if (not error):
+		try:
+			media_check_box = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-include-card']")))
+			has_media = True
+		except Exception as e:
+			has_media = False
+			print("[GET EMBED HTML] Tweet_url = {} does not contain media".format(url))
+		
+		try:
+			embed_html_text_element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[class='embed-destination-wrapper']")))
+			#The element with the html for embed a tweet is not accesible so it's trickery time
+			accionador = webdriver.ActionChains(driver)
 			accionador.double_click(embed_html_text_element).perform()
 			driver.implicitly_wait(10)
-			accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform()
-			embed_without_media = pyperclip.paste()
-		else:
-			embed_without_media = pyperclip.paste()
-			embed_with_media = None
+			accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform() # do the same of control c
 
 
-		# print("embed_with_media {}".format(embed_with_media))
+			if has_media:
+				embed_with_media = pyperclip.paste()
+				media_check_box.click()
+				accionador.double_click(embed_html_text_element).perform()
+				driver.implicitly_wait(10)
+				accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform()
+				embed_without_media = pyperclip.paste()
+			else:
+				embed_without_media = pyperclip.paste()
+				embed_with_media = None
 
-		# print("embed_without_media {}".format(embed_without_media))
-	except Exception as e:
-		print("[get_twitter_user_rts_and_favs ERROR] There was an error copying to the clipboard")
-		print(e.__cause__)
 
-	if embed_with_media != None:
-		embed_with_media = embed_with_media.replace("\"","'")
-	if embed_without_media != None:
-		embed_without_media = embed_without_media.replace("\"","'")
+			# print("embed_with_media {}".format(embed_with_media))
 
-	return embed_with_media,embed_without_media
+			# print("embed_without_media {}".format(embed_without_media))
+		except Exception as e:
+			print("[get_twitter_user_rts_and_favs ERROR] There was an error copying to the clipboard")
+			print(e.__cause__)
+
+		if embed_with_media != None:
+			embed_with_media = embed_with_media.replace("\"","'")
+		if embed_without_media != None:
+			embed_without_media = embed_without_media.replace("\"","'")
+
+		return embed_with_media,embed_without_media
+	return None,None
 
 
 #returns list(retweet users),list(favorite users) for a given screen_name and status_id

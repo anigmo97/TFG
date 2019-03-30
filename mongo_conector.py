@@ -136,8 +136,10 @@ def get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection):
     print(dict_tweet_user)
     return dict_tweet_user
 
-def get_tweets_to_analyze_or_update_stats(collection):
-    return db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids }})
+def get_tweets_to_analyze_or_update_stats(collection,limit=0):
+    lista_tweets = list(db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids }}).limit(limit))
+    print("[TWEETS FOR ANALYZE] {} tweets retrieved".format(len(lista_tweets)))
+    return lista_tweets
 
 
 def get_tweet_owner_dict_data_of_tweet_ids(tweet_id_list,collection):
@@ -248,7 +250,7 @@ def do_additional_actions_for_statistics_file(statistics_dict,collection):
     #     print("[MONGO STATISTICS WARN] El fichero está corrupto messages_count={} database_count={}".format(statistics_dict["messages_count"],get_count_of_a_collection(collection)))
     #     delete_statistics_file()
     #     return None
-
+    print("[MONGO STATISTICS INFO] Changing bullets for dots")
     way_of_send_with_keys_with_dots =  change_bullet_in_keys_for_dot(statistics_dict["way_of_send_counter"])
     statistics_dict["way_of_send_counter"] = way_of_send_with_keys_with_dots
     return statistics_dict
@@ -309,6 +311,7 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
     way_of_send_with_keys_without_dots =  change_dot_in_keys_for_bullet(statistics_dict["way_of_send_counter"])
     statistics_dict["way_of_send_counter"] = way_of_send_with_keys_without_dots
 
+    print("[MONGO INSERT STATISTICS FILE INFO] Inserting new statistics file in collection {}".format(collection))
     if get_statistics_file_from_collection(collection) == None:
         print("[MONGO INSERT STATISTICS FILE INFO] Inserting new statistics file")
         db[collection].insert(statistics_dict)
@@ -428,7 +431,7 @@ def insert_or_update_searched_users_file(collection, user,user_id,captured_tweet
      file_id=searched_users_file_id,user=user,user_id=user_id,partido=partido)
 
 
-def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS):
+def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS):
 
     logs = get_log_dict_for_special_file_id(users_file_id)
 
@@ -451,6 +454,8 @@ def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP
         aux["likes_to_PSOE"] = (likes_to_PSOE or 0)
         aux["likes_to_PODEMOS"] = (likes_to_PODEMOS or 0)
         aux["likes_to_CIUDADANOS"] = (likes_to_CIUDADANOS or 0)
+        aux["likes_to_VOX"] = (likes_to_VOX or 0)
+        aux["likes_to_COMPROMIS"] = (likes_to_COMPROMIS or 0)
         aux["last_like_registered"] = str(datetime.now())
         special_doc_dict[user_id]= aux
     else:
@@ -460,6 +465,8 @@ def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP
         aux["likes_to_PSOE"] = aux["likes_to_PSOE"] + (likes_to_PSOE or 0)
         aux["likes_to_PODEMOS"] = aux["likes_to_PODEMOS"] + (likes_to_PODEMOS or 0)
         aux["likes_to_CIUDADANOS"] = aux["likes_to_CIUDADANOS"] + (likes_to_CIUDADANOS or 0)
+        aux["likes_to_VOX"] = aux["likes_to_VOX"] + (likes_to_VOX or 0)
+        aux["likes_to_COMPROMIS"] = aux["likes_to_COMPROMIS"] + (likes_to_COMPROMIS or 0)
         aux["last_like_registered"] = str(datetime.now())
         special_doc_dict[user_id] = aux
 
@@ -522,6 +529,6 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
 
 def mark_docs_as_analyzed(docs_ids,collection):
-    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":True}})
+    print("[mark_docs_as_analyzed] marking as analyzed {} tweets".format(len(docs_ids)))
+    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":True}}, multi=True)
 
-print(get_users_of_a_political_party("CS","test2"))

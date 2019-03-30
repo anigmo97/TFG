@@ -65,9 +65,7 @@ class StreamListener(tweepy.StreamListener):
         if len (self.mongo_tweets_ids_list)>0:
             #coger lo que retorna el insert many
             tweets_no_reps = mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
-            analyze_tweets(tweets_no_reps)
-            mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-            mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,self.streamming_tweets,self.first_tweet_id,self.last_tweet_id,self.min_created_at, self.max_created_at)
+            mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,len(tweets_no_reps),self.first_tweet_id,self.last_tweet_id,self.min_created_at, self.max_created_at)
             print("[ON DISCONNECT INFO] FINISH")
         
 
@@ -110,10 +108,7 @@ class StreamListener(tweepy.StreamListener):
                 if len(self.mongo_tweets_ids_list) > self.trunk:
                     print("[ON DATA INFO] {} messages are going to be inserted in mongo".format(len(self.mongo_tweets_ids_list)))
                     self.tweets_no_repetidos = mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
-                    print("[ON DATA INFO] {} messages are going to be analyzed".format(len(self.tweets_no_repetidos)))
-                    analyze_tweets(self.tweets_no_repetidos)
-                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                    mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,self.streamming_tweets,self.first_tweet_id,current_tweet_id,self.min_created_at, current_created_at)
+                    mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,len(self.tweets_no_repetidos),self.first_tweet_id,current_tweet_id,self.min_created_at, current_created_at)
                     self.mongo_tweets_dict = {}
                     self.mongo_tweets_ids_list = []
                 if(self.streamming_tweets >= self.max_tweets):
@@ -210,7 +205,7 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
         if(tweet.get("id_str",False) != False):
             tweet_id = tweet["id_str"]
             if until_tweet_id != None and tweet_id < until_tweet_id:
-                print("\n\nbreak\n\n")
+                print("\n\nbreak por tweet_id menor que el maximo\n\n")
                 break
             tweet["_id"]= tweet_id
             tweet["analyzed"] = False
@@ -223,8 +218,9 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
         min_creation_date = mongo_tweets_dict[min_tweet_id]["created_at"]
         max_creation_date = mongo_tweets_dict[max_tweet_id]["created_at"]
 
-    print("{} tweets capturados".format(len(mongo_tweets_id_list)))
+
     tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
+    print("{} tweets nuevos capturados ".format(len(tweets_sin_repetir)))
 
     user_id = API.get_user(screen_name = user_screen_name).id_str
     mongo_conector.insert_or_update_searched_users_file(mongo_conector.current_collection,user_screen_name,user_id,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,min_creation_date,max_creation_date,partido)
@@ -266,7 +262,7 @@ def get_specifics_tweets_from_api_and_update_mongo(tweets_ids_list):
                 print("limite alcanzado")
             else:
                 tweet_dict["_id"] = tweet_dict["id_str"]
-                tweet["analyzed"] = False
+                tweet_dict["analyzed"] = "ed but outdated"
                 new_version_of_tweets.append(tweet_dict)
                 updated_tweets_count += 1
             x+=1

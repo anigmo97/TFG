@@ -239,12 +239,18 @@ def build_embed_top_tweets_dict():
             
 
             if registry_dict == None: # guardar los tweets respondidos y citados en owner_dict
-                print("[REVISAR] tweet_id = {}".format(tweet_id))
+                print("[REVISAR] tweet_id = {} (no tenemos su dueño) ".format(tweet_id))
             else:
                 user_screen_name = registry_dict["user_screen_name"]
                 embed_with_media,embed_without_media = twitter_web_consumer.get_embed_html_of_a_tweet(user_screen_name,tweet_id,driver)
-                aux = { "embed_with_media" : embed_with_media , "embed_without_media" : embed_without_media}
-                global_variables.tweets_embed_html_dict[tweet_id] = aux
+                if (embed_without_media != None):
+                    aux = { "embed_with_media" : embed_with_media , "embed_without_media" : embed_without_media}
+                    global_variables.tweets_embed_html_dict[tweet_id] = aux
+                else:
+                    print("[build_embed_top_tweets_dict] entry added with error indicator {}".format(tweet_id))
+                    aux = { "embed_with_media" : '<h3> Tweet possibly removed from twitter</h3>' ,
+                     "embed_without_media" : '<h3> Tweet possibly removed from twitter</h3>'}
+                    global_variables.tweets_embed_html_dict[tweet_id] = aux
     driver.close()
 
 
@@ -340,12 +346,33 @@ def analyze_tweets(current_tweet_dict_list):
             print("[ANALYZE_TWEETS WARN] There are duplicates in the messages analyzed")
             input() 
     
-    update_tweets_owner_dict()
-    build_embed_top_tweets_dict()
 
     #show_info() #TODO decidir si llamarlo solo una vez cuno se le pase directorios
 
     print('\n\nMensajes analizados: {} Time: {}\n\n'.format(global_variables.messages_count,timeit.default_timer() - start))
+
+def analyze_tweets_and_mark_in_mongo(cursor_tweets):
+    lista_tweets_nuevos = []
+    lista_tweets_actualizados =[]
+    for tweet in cursor_tweets:
+        # print(json.dumps(tweet,indent=4,sort_keys=True))
+        # print(tweet["_id"])
+        if tweet["analyzed"] == False:
+            lista_tweets_nuevos.append(tweet)
+        else:
+            lista_tweets_actualizados.append(tweet) # tweets analyzed but outdated
+
+    if len(lista_tweets_nuevos) > 0:
+        analyze_tweets(lista_tweets_nuevos)
+        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+        mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
+        lista_tweets_nuevos = []
+    if len(lista_tweets_actualizados) > 0:
+        analyze_new_versions_of_tweets(lista_tweets_actualizados)
+        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
+        mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_actualizados],mongo_conector.current_collection)
+        lista_tweets_actualizados =[]
+
 
 def put_hashtag_in_query(query):
     if not query.startswith("#"):
@@ -355,17 +382,21 @@ def put_hashtag_in_query(query):
 def get_likes_values(partido):
     try:
         if partido=="PP":
-            val = (1,0,0,0)
+            val = (1,0,0,0,0,0)
         elif partido == "PSOE":
-            val =  (0,1,0,0)
+            val =  (0,1,0,0,0,0)
         elif partido == "PODEMOS":
-            val= (0,0,1,0)
+            val= (0,0,1,0,0,0)
         elif partido == "CIUDADANOS":
-            val = (0,0,0,1)
+            val = (0,0,0,1,0,0)
+        elif partido == "VOX":
+            val = (0,0,0,0,1,0)
+        elif partido == "COMPROMIS":
+            val = (0,0,0,0,0,1)
         else:
-            val = (0,0,0,0)
+            val = (0,0,0,0,0,0)
     except:
-        return (0,0,0,0)
+        return (0,0,0,0,0,0)
     return val
 
 #############################################################################################################################
@@ -388,11 +419,14 @@ if __name__ == "__main__":
     parser.add_argument("-q","-Q","--query",help="get tweets from twitter API by query save it in mongoDb", type=str)
     parser.add_argument("-qu","-QU","-uq","--query_user",nargs='+',help="get tweets from twitter API by user save it in mongoDb", type=str)
     parser.add_argument("-qf","-QF","--query_file",help="get tweets from twitter API by query save it in a file", type=str)
+    parser.add_argument("--likes",help="get likes from tweets of searched users", action="store_true")
 
     parser.add_argument("-w","-W","--words",nargs='+',help="specify words that should be used in the collected tweets.This option has to be used in streamming",type=str)
     parser.add_argument("-mm","-MM","--max_messages",help="specify maximum num of messages to collect",type=int)
     parser.add_argument("-mt","-MT","--max_time",help="specify maximum time of collecting in minutes.This option has to be used in streamming",type=int)
-    parser.add_argument("-p","-P","--partido",help="specify political party (only can be used with -qu option)",choices=["PP","pp","PSOE","psoe","Psoe","Podemos","podemos","PODEMOS","ciudadanos","cs","CIUDADANOS","CS","Ciudadanos"])
+    parser.add_argument("-p","-P","--partido",help="specify political party (only can be used with -qu option)",
+    choices=["PP","pp","PSOE","psoe","Psoe","Podemos","podemos","PODEMOS","ciudadanos","cs","CIUDADANOS","CS","Ciudadanos",
+    "vox","VOX","Vox","compromis","Compromis","COMPROMIS"])
     parser.add_argument("-l","-L","--loop",help="execute the action in loop",action="store_true")
     parser.add_argument("-t","-T","--analysis_trunk",help="trunk to use in analysis to not overload data",type=int)
 
@@ -426,10 +460,12 @@ if __name__ == "__main__":
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
     # There is no filesystem options so we are going to check -s -q -qf -cq options
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.query_user) \
-        + checkParameter(args.collection_query) + checkParameter(args.collection_users) + checkParameter(args.analyze)> 1:
-        throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' -a -qf -qu -cu o -cq de forma simultanea ")
+        + checkParameter(args.collection_query) + checkParameter(args.collection_users) + checkParameter(args.analyze)\
+            + checkParameter(args.likes)> 1:
+        throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' -a --likes -qf -qu -cu o -cq de forma simultanea ")
     elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
-        + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) + checkParameter(args.analyze) == 1:
+        + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) \
+            + checkParameter(args.analyze) + checkParameter(args.likes) == 1:
         if checkParameter(args.query): # -q option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
                 + checkParameter(args.loop) + checkParameter(args.output_file) +checkParameter(args.analysis_trunk)> 0:
@@ -446,6 +482,10 @@ if __name__ == "__main__":
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.output_file) +\
                 + checkParameter(args.partido) +checkParameter(args.max_messages)> 0:
                 throw_error(sys.modules[__name__],"Con la opción -a no se pueden usar las opciones -w -p -mm -mt -up -mm o -o")
+        elif checkParameter(args.likes): # --likes option
+            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.output_file) +\
+                + checkParameter(args.partido) +checkParameter(args.max_messages)> 0:
+                throw_error(sys.modules[__name__],"Con la opción --likes no se pueden usar las opciones -w -p -mm -mt -up -mm o -o")
         elif checkParameter(args.collection_query): # -cq option
             if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) +\
                 checkParameter(args.collection) +checkParameter(args.analysis_trunk)> 0:
@@ -490,44 +530,18 @@ if __name__ == "__main__":
             argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
             consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
 
-        elif checkParameter(args.analyze):
+        elif checkParameter(args.analyze): # -a option
             statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
             if statistics_file != None:
                 global_variables.set_statistics_from_statistics_dict(statistics_file)
-            cursor_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection)
             trunk = args.analysis_trunk or 500
+            
             cond = True
-            lista_tweets_nuevos = []
-            lista_tweets_actualizados =[]
             while cond:
-                for tweet in cursor_tweets:
-                    print(json.dumps(tweet,indent=4,sort_keys=True))
-                    print(tweet["_id"])
-                    if tweet["analyzed"] == False:
-                        lista_tweets_nuevos.append(tweet)
-                    else:
-                        lista_tweets_actualizados.append(tweet)
-                    if len(lista_tweets_nuevos) >= trunk:
-                        analyze_tweets(lista_tweets_nuevos)
-                        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                        mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
-                        lista_tweets_nuevos = []
-                    if len(lista_tweets_actualizados) >= trunk:
-                        analyze_new_versions_of_tweets(lista_tweets_actualizados)
-                        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                        mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
-                        lista_tweets_actualizados =[]
-                
-                if len(lista_tweets_nuevos) >= trunk:
-                    analyze_tweets(lista_tweets_nuevos)
-                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                    mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
-                    lista_tweets_nuevos = []
-                if len(lista_tweets_actualizados) >= trunk:
-                    analyze_new_versions_of_tweets(lista_tweets_actualizados)
-                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
-                    mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_nuevos],mongo_conector.current_collection)
-                    lista_tweets_actualizados =[]
+                lista_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection,trunk)
+                while len(lista_tweets) >0:
+                    analyze_tweets_and_mark_in_mongo(lista_tweets)
+                    lista_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection,trunk)
                 cond = args.loop
             
 
@@ -544,8 +558,26 @@ if __name__ == "__main__":
                     else:
                         tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(query=query,until_tweet_id=max_tweet_id)
                 cond = args.loop
+            update_tweets_owner_dict()
+            build_embed_top_tweets_dict()
 
         elif checkParameter(args.collection_users): # -cu option
+            cond = True
+            while cond:
+                searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+                users = searched_users_file.keys()
+                tweets_files_list = []
+                for user in users:
+                    if user != "_id" and user != "total_captured_tweets":
+                        print("user = {}".format(user))
+                        max_tweet_id = searched_users_file[user]["max_tweet_id"]
+                        if checkParameter(args.max_messages) > 0:
+                            tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(max_tweets=args.max_messages,user_screen_name=user,until_tweet_id=max_tweet_id)
+                        else:
+                            tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
+                cond = args.loop
+
+        elif checkParameter(args.likes): # --likes option
             cond = True
             driver = twitter_web_consumer.open_twitter_and_login()
             while cond:
@@ -553,14 +585,9 @@ if __name__ == "__main__":
                 users = searched_users_file.keys()
                 tweets_files_list = []
                 for user in users:
-                    if user != "_id":
-                        max_tweet_id = searched_users_file[user]["max_tweet_id"]
+                    if user != "_id" and user != "total_captured_tweets":
                         partido = searched_users_file[user]["partido"]
-                        likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS = get_likes_values(partido)
-                        if checkParameter(args.max_messages) > 0:
-                            tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(max_tweets=args.max_messages,user_screen_name=user,until_tweet_id=max_tweet_id)
-                        else:
-                            tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
+                        likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS = get_likes_values(partido)
                         user_id = mongo_conector.get_user_id_wih_screenname(user)
                         if user_id != None:
                             ids = mongo_conector.get_tweet_ids_list_of_a_user_from_collection(user_id,mongo_conector.current_collection)
@@ -568,7 +595,7 @@ if __name__ == "__main__":
                                 num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
                                 mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user)
                                 for u_id,u,u_screen in users_who_liked:
-                                    mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS)
+                                    mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS)
 
                 cond = args.loop
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
