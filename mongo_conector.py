@@ -183,6 +183,16 @@ def get_users_screen_name_dict_of_tweet_ids_for_tops_in_statistics_file(statisti
 
     return  get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection)
 
+def get_tweet_list_by_tweet_id_using_regex(regex,collection):
+    return [ x for x in db[collection].find({'-id':{'$regex':regex, '$nin': special_doc_ids}})]
+
+def get_tweet_dict_by_tweet_id_using_regex(regex,collection):
+    return  { x['_id'] : x for x in db[collection].find({'_id':{'$regex':regex, '$nin': special_doc_ids}})}
+
+
+def get_tweet_by_id(id_str,collection):
+    return db[collection].find_one({'_id':id_str})
+
 
 
 ##########################################################################################
@@ -446,7 +456,7 @@ def insert_or_update_searched_users_file(collection, user,user_id,captured_tweet
      file_id=searched_users_file_id,user=user,user_id=user_id,partido=partido)
 
 
-def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS):
+def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id):
 
     logs = get_log_dict_for_special_file_id(users_file_id)
 
@@ -472,6 +482,7 @@ def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP
         aux["likes_to_VOX"] = (likes_to_VOX or 0)
         aux["likes_to_COMPROMIS"] = (likes_to_COMPROMIS or 0)
         aux["last_like_registered"] = str(datetime.now())
+        aux["tweet_ids_liked_list"] =[tweet_id]
         special_doc_dict[user_id]= aux
     else:
         print("[INSERT OR UPDATE {0} INFO] Query is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
@@ -483,6 +494,7 @@ def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP
         aux["likes_to_VOX"] = aux["likes_to_VOX"] + (likes_to_VOX or 0)
         aux["likes_to_COMPROMIS"] = aux["likes_to_COMPROMIS"] + (likes_to_COMPROMIS or 0)
         aux["last_like_registered"] = str(datetime.now())
+        aux["tweet_ids_liked_list"].append(tweet_id)
         special_doc_dict[user_id] = aux
 
 
@@ -504,11 +516,12 @@ def insert_tweet_of_searched_users_not_captured_yet_file(special_doc_dict,collec
     except:
         db[collection].replace_one({"_id" : tweet_of_searched_users_not_captured_yet_file_id },special_doc_dict,upsert=True)
 
-def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_liked_list,author_id,author_screen_name):
+def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_liked_dict,author_id,author_screen_name,tupla_likes):
 
     logs = get_log_dict_for_special_file_id(likes_list_file_id)
 
     special_doc_dict = _get_special_file(collection,likes_list_file_id)
+    likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS = tupla_likes
 
     if special_doc_dict != None:
         print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
@@ -524,19 +537,23 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         aux["tweet_id"] = tweet_id
         aux["user_id"] = author_id
         aux["user_screen_name"] = author_screen_name
-        aux["users_who_liked"] = users_who_liked_list
+        aux["users_who_liked"] = users_who_liked_dict
+        for user_id,user_name,user_screen_name in users_who_liked_dict.values():
+            insert_or_update_users_file(collection,user_id,user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id)
         aux["num_likes"] = num_likes
-        new_likes = users_who_liked_list
         aux["last_like_resgistered"] = str(datetime.now())
+        aux["num_likes_capturados"] = len(aux["users_who_liked"])
         special_doc_dict[tweet_id]= aux
     else:
         print("[INSERT OR UPDATE {0} INFO] Query is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
         aux = special_doc_dict[tweet_id]
-        last_25_likes = aux["users_who_liked"][-25:]
-        last_25_ids = [x[0] for x in last_25_likes]
-        new_likes = [ x for x in users_who_liked_list if x[0] not in last_25_ids]
-        aux["users_who_liked"] = users_who_liked_list + new_likes
+        print(aux["users_who_liked"])
+        for user_id,user_name,user_screen_name in users_who_liked_dict.values():
+            if user_id not in aux["users_who_liked"]:
+                aux["users_who_liked"][user_id] = (user_id,user_name,user_screen_name)
+                insert_or_update_users_file(collection,user_id,user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id)
         aux["num_likes"] = num_likes
+        aux["num_likes_capturados"] = len(aux["users_who_liked"])
         aux["last_like_resgistered"] = str(datetime.now())
         special_doc_dict[tweet_id] = aux
 
@@ -549,10 +566,21 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
         db[collection].replace_one({"_id" : likes_list_file_id },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
+    
+    return len(aux["users_who_liked"])
 
-    return new_likes
 
 def mark_docs_as_analyzed(docs_ids,collection):
     print("[mark_docs_as_analyzed] marking as analyzed {} tweets".format(len(docs_ids)))
     db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":True}}, multi=True)
+
+def mark_docs_as_not_analyzed(collection):
+    docs_ids = get_tweet_ids_list_from_database(collection)
+    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":False}}, multi=True)
+    print("[MONGO STATISTICS WARN] Deleting statistics file")
+    db[collection].remove({"_id":statistics_file_id})
+    print("[MONGO STATISTICS WARN] Statistics file has been deleted")
+
+#mark_docs_as_not_analyzed("test2")
+    
 

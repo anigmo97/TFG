@@ -34,7 +34,7 @@ not_verified_account_messages = 0
 not_verified_account_tweets = 0
 not_verified_account_retweets = 0
 
-tweets_by_polarity = [0,0,0,0,0,0] #TODO
+#tweets_by_polarity = [0,0,0,0,0,0] #TODO
 
 tweets_dict = {} #contains the captured messages
 retweets_dict = {} #contains tweets that was retweeted in our captured messages
@@ -86,7 +86,10 @@ local_most_quoted_tweets = create_top_ten_list()
 
 def check_variable_conditions(k,v):
 	# si no s una variable protegida no es tmp (tmp es local) y no es especial
-	key_conditions = not k.startswith('_') and k not in ["tmp","In","Out","ID","AMOUNT"] and (not "dict" in k or (k in ["users_dict","tweets_owner_dict","tweets_embed_html_dict"]))
+	#key_conditions = not k.startswith('_') and k not in ["tmp","In","Out","ID","AMOUNT"] and (not "dict" in k or (k in ["users_dict","tweets_owner_dict","tweets_embed_html_dict"]))
+	acepted_dicts = ["users_dict","tweets_owner_dict","tweets_embed_html_dict","verified_account_dict_tweets","not_verified_account_dict_tweets"]
+	key_conditions = not k.startswith('_') and k not in ["tmp","In","Out","ID","AMOUNT"] and (not "dict" in k or (k in acepted_dicts))
+
 	# si no es una funcion
 	value_condition = not hasattr(v, '__call__')
 	return  key_conditions and value_condition

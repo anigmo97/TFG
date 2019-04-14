@@ -6,7 +6,7 @@ import os
 import timeit
 # USER MODULES IMPORTS
 import global_variables
-from global_functions import update_top_10_list,throw_error,notNone,checkParameter,isJsonFile,increment_dict_counter
+from global_functions import update_top_10_list,throw_error,notNone,checkParameter,checkOptions, isJsonFile,increment_dict_counter
 from global_functions import get_utc_time_particioned,insert_tweet_in_date_dict,create_dir_if_not_exits,get_string_datetime_with_n_min_more_than_now
 from global_functions import get_string_datetime_now
 from logger import show_info,show_parameters
@@ -14,6 +14,7 @@ import twitter_api_consumer as consumer
 import twitter_web_consumer
 import mongo_conector
 from threading import Thread
+from time import sleep
 
 
 patron_way_of_send = u"rel(.*)>([\s\S]*?)<(.*)"
@@ -261,7 +262,7 @@ def initialize_likes_queue(users,collection,initial_messages,likes_ratio):
             user_registry = { }
             tweet_queue = []
             partido = searched_users_file[user]["partido"]
-            likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS = get_likes_values(partido)
+            tupla_likes = get_likes_values(partido)
             user_id = mongo_conector.get_user_id_wih_screenname(user)
             if user_id != None:
                 ids = mongo_conector.get_last_n_tweets_of_a_user_in_a_collection(user_id,mongo_conector.current_collection,args.initial_messages or 20)
@@ -269,17 +270,21 @@ def initialize_likes_queue(users,collection,initial_messages,likes_ratio):
                     tweet_queue.append(tweet_id)
                     # We don't count the first likes retrieve
                     user_registry[tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
-                    num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                    mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user)
-                    for u_id,u,u_screen in users_who_liked:
-                        mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS)
-
+                    num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
+                    mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked_dict,user_id,user,tupla_likes)
             user_registry["tweet_queue"] = tweet_queue
             likes_queue_dict[user] = user_registry
-    
     # print(likes_queue_dict)
     # input()
     return likes_queue_dict
+
+def some_users_has_tweets_in_queue(likes_queue):
+    for k,v in likes_queue.items():
+        if len(v["tweet_queue"])>0:
+            return True
+    return False
+    
+
 
 
 def analyze_tweets_from_filesystem(json_files_paths):
@@ -397,7 +402,6 @@ def analyze_tweets_and_mark_in_mongo(cursor_tweets):
         lista_tweets_nuevos = []
     if len(lista_tweets_actualizados) > 0:
         analyze_new_versions_of_tweets(lista_tweets_actualizados)
-        mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
         mongo_conector.mark_docs_as_analyzed([x["_id"] for x in lista_tweets_actualizados],mongo_conector.current_collection)
         lista_tweets_actualizados =[]
 
@@ -415,6 +419,36 @@ def put_hashtag_in_query(query):
     if not query.startswith("#"):
         query = "#" + query
     return query
+
+def remove_at_sign(word):
+    if word.startswith("@"):
+        word = word[1:]
+    return word
+
+
+def add_new_tweets_of_this_user_to_queue(user_registry,user_id,user,initial_messages):                              
+    ids = mongo_conector.get_last_n_tweets_of_a_user_in_a_collection(user_id,mongo_conector.current_collection,initial_messages or 20)
+    # CHECK IF API CAPTURED SOME NEW TWEETS
+    for tweet_id in ids:
+        if tweet_id not in user_registry:
+            user_registry["tweet_queue"].append(tweet_id)
+            user_registry[tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
+
+    # CHECK IF NEW TWEETS WERE DETECTED IN WEB
+    additional_ids_file = mongo_conector.get_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection)
+    if additional_ids_file != None:
+        for tweet_id in additional_ids_file[user_id]:
+            if tweet_id not in user_registry:
+                user_registry["tweet_queue"].append(tweet_id)
+                user_registry[tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
+
+    return user_registry
+
+def add_log(file,content):
+    with open(file+".txt","a+") as f:
+        f.write("\n\n\n\n{}".format(get_string_datetime_now()))
+        f.write(json.dumps(content,indent=2,sort_keys=True))
+    
 
 def get_likes_values(partido):
     try:
@@ -468,7 +502,8 @@ if __name__ == "__main__":
     parser.add_argument("-t","-T","--analysis_trunk",help="trunk to use in analysis to not overload data",type=int)
     parser.add_argument("-lr","--likes_ratio",help="Sets a number of likes to get for a tweets in 30 min to keep capturing likes",type=int)
     parser.add_argument("-im","--initial_messages",help="Sets in how many tweets capture likes ( last n tweets)",type=int)
-
+    parser.add_argument("--forced",help="Analyze the collection removing the satistics file at the beginning",action="store_true")
+    #TODO implement this option
 
     parser.add_argument("-c","-C","--collection",help="MongoDB collection to use",type=str)
     parser.add_argument("-cq", "-CQ","--collection_query",help="Execute querys registered in the query file of a collection",type=str)
@@ -476,7 +511,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-e","-E","--examples",action='store_true')
     args = parser.parse_args()
-    show_parameters(args)
+    options_passed = sum([checkParameter(value) for key,value in vars(args).items()])
     fileSystemMode = False
     exist_thread = False
     recalculate_statistics = False
@@ -487,64 +522,54 @@ if __name__ == "__main__":
 ###################################################################################################################################################
 ###################################################################### CHECK ERRORS ###############################################################
 ###################################################################################################################################################
-
+    
     # We control filesystem options
     if checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) > 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-f' '-d' o -dd de forma simultanea ")
-    elif checkParameter(args.file) + checkParameter(args.directory) + checkParameter(args.directory_of_directories) == 1:
-        if checkParameter(args.update) + checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
-        + checkParameter(args.words) + checkParameter(args.max_messages) + checkParameter(args.max_time) + checkParameter(args.collection) \
-        + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) \
-        + checkParameter(args.loop) + checkParameter(args.partido) + checkParameter(args.examples)>0 + checkParameter(args.analyze)\
-        + checkParameter(args.analysis_trunk) + checkParameter(args.likes) + checkParameter(args.likes_ratio) \
-        + checkParameter(args.initial_messages)>0:
+    elif checkOptions(args.directory_of_directories,args.directory,args.file) == 1 :
+        if checkOptions(args.directory_of_directories,args.directory,args.file) + checkParameter(args.output_file) < options_passed:
             throw_error(sys.modules[__name__],"Con las opciones '-f' '-d' o -dd solo se puede usar la opcion -o ")
-    # There is no filesystem options so we are going to check -s -q -qf -cq options
-    elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) + checkParameter(args.query_user) \
-        + checkParameter(args.collection_query) + checkParameter(args.collection_users) + checkParameter(args.analyze)\
-            + checkParameter(args.likes)> 1:
+    
+    
+    # There is no filesystem options so we are going to check pricipal options (-s -q -qf -qu -cq -cq -a --likes )
+    elif checkOptions(args.streamming,args.query,args.query_file,args.query_user,args.collection_query,args.collection_users,args.analyze,args.likes)> 1:
         throw_error(sys.modules[__name__],"No se pueden usar las opciones '-s' '-q' -a --likes -qf -qu -cu o -cq de forma simultanea ")
-    elif checkParameter(args.streamming) + checkParameter(args.query) + checkParameter(args.query_file) \
-        + checkParameter(args.collection_query) + checkParameter(args.query_user) + checkParameter(args.collection_users) \
-            + checkParameter(args.analyze) + checkParameter(args.likes) == 1:
+
+    elif checkOptions(args.streamming,args.query,args.query_file,args.query_user,args.collection_query,args.collection_users,args.analyze,args.likes) == 1:
         if checkParameter(args.query): # -q option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
-                + checkParameter(args.loop) + checkParameter(args.output_file) +checkParameter(args.analysis_trunk) \
-                    + checkParameter(args.likes_ratio) + checkParameter(args.initial_messages)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -q no se pueden usar las opciones -w, -lr, -im, -mt, -p, -t -l ,-up o -o")
+            if checkOptions(args.query,args.max_messages,args.max_time,args.collection)< options_passed:
+                throw_error(sys.modules[__name__],"Con la opción -q solo se pueden utilizar las opciones: -mm -mt -c")
+
         elif checkParameter(args.query_file): # -qf option
-            if checkParameter(args.words) + checkParameter(args.max_time) +checkParameter(args.update) + checkParameter(args.partido) \
-                + checkParameter(args.loop) + checkParameter(args.examples) + checkParameter(args.collection) +checkParameter(args.analysis_trunk)\
-                + checkParameter(args.likes_ratio) + checkParameter(args.initial_messages) > 0:
-                throw_error(sys.modules[__name__],"Con la opción -qf solo se pueden usar la opción -mm y -o")
+            if checkOptions(args.query_file,args.output_file,args.max_messages) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opción -qf solo se pueden utilizar las opciones: -mm -o")
+
         elif checkParameter(args.query_user): # -qu option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.loop) \
-                + checkParameter(args.output_file) +checkParameter(args.analysis_trunk) + checkParameter(args.likes_ratio) +\
-                     checkParameter(args.initial_messages)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -qu no se pueden usar las opciones -w ,-mt, -im, -lr, -t, -l, -up o -o")
-        elif checkParameter(args.analyze):
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.output_file) +\
-                + checkParameter(args.partido) +checkParameter(args.max_messages) + checkParameter(args.likes_ratio) + checkParameter(args.initial_messages)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -a no se pueden usar las opciones -w -p -lr -im -mm -mt -up -mm o -o")
+            if checkOptions(args.query_user,args.max_messages,args.partido,args.collection) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opción -qu solo se pueden utilizar las opciones: -mm -p -c")
+
+        elif checkParameter(args.analyze): # -a option
+            if checkOptions(args.analyze,args.collection,args.analysis_trunk,args.loop,args.forced) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opción -a solo se pueden utilizar las opciones: -c -t -l --forced ")
+
         elif checkParameter(args.likes): # --likes option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.output_file) +\
-                + checkParameter(args.partido) +checkParameter(args.max_messages)> 0:
-                throw_error(sys.modules[__name__],"Con la opción --likes no se pueden usar las opciones -w -p -mm -mt -up -mm o -o")
+            if checkOptions(args.likes,args.initial_messages,args.loop,args.likes_ratio,args.collection)< options_passed:
+                throw_error(sys.modules[__name__],"Con la opción --likes solo se pueden utilizar las opciones: -im -l -lr -c")
+
         elif checkParameter(args.collection_query): # -cq option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) +\
-                checkParameter(args.collection) +checkParameter(args.analysis_trunk) + checkParameter(args.likes_ratio) + checkParameter(args.initial_messages)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -cq no se pueden usar las opciones -w, -im, -lr -mt, -p, -t, -up o -c")
+            if checkOptions(args.collection_query,args.loop,args.max_messages) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opción -cq solo se pueden utilizar las opciones: -l -mm")
+
         elif checkParameter(args.collection_users): # -cu option
-            if checkParameter(args.words) + checkParameter(args.max_time) + checkParameter(args.update) + checkParameter(args.partido) \
-                + checkParameter(args.collection) + checkParameter(args.analysis_trunk) + checkParameter(args.likes_ratio) + checkParameter(args.initial_messages)> 0:
-                throw_error(sys.modules[__name__],"Con la opción -cu no se pueden usar las opciones -w, -lr , -im, -mt, -t -p, -up o -c")
-        else: # -s option TODO poner filtros
-            if checkParameter(args.update) == 1:
-                throw_error(sys.modules[__name__],"La opcion update solo esta disponible en el modo por defecto")
+            if checkOptions(args.collection_users,args.max_messages,args.loop) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opción -cu solo se pueden utilizar las opciones: -l -mm")
+
+        else: # -s option 
+            if checkOptions(args.streamming,args.words,args.max_time,args.max_messges,args.loop) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opcion -s solo se pueden utilizar las opciones: -w -mt -mm -c")
     else:
-        if checkParameter(args.words) + checkParameter(args.max_messages) +checkParameter(args.max_time) + \
-        checkParameter(args.partido) + checkParameter(args.loop) + checkParameter(args.likes_ratio) + checkParameter(args.initial_messages)>1:
-            throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones (-f, -d, -dd, -q, -qf, -s) no se pueden usar las opciones -w -mm -mt -im -lr -l o -p")
+        if checkOptions(args.collection,args.update):
+            throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones principales) solo se pueden utilizar las opciones: -up -c")
 
 ###################################################################################################################################################
 ###################################################################### FIN CHECK ERRORS ###########################################################
@@ -569,6 +594,7 @@ if __name__ == "__main__":
                 if args.partido =="CS":
                     args.partido = "CIUDADANOS"
             for screen_name in args.query_user:
+                screen_name = remove_at_sign(screen_name)
                 tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=screen_name,max_tweets =(args.max_messages or 3000),partido=args.partido)
 
         elif checkParameter(args.streamming): # -s option
@@ -576,6 +602,8 @@ if __name__ == "__main__":
             consumer.collect_tweets_by_streamming_and_save_in_mongo(args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
 
         elif checkParameter(args.analyze): # -a option
+            if checkParameter(args.forced):
+                mongo_conector.mark_docs_as_not_analyzed(mongo_conector.current_collection)
             statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
             if statistics_file != None:
                 global_variables.set_statistics_from_statistics_dict(statistics_file)
@@ -586,8 +614,14 @@ if __name__ == "__main__":
                 lista_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection,trunk)
                 while len(lista_tweets) >0:
                     analyze_tweets_and_mark_in_mongo(lista_tweets)
+                    update_tweets_owner_dict()
+                    build_embed_top_tweets_dict()
+                    mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
                     lista_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection,trunk)
                 cond = args.loop
+                if cond:
+                    sleep(600)
+                
             
 
         elif checkParameter(args.collection_query): # -cq option
@@ -603,8 +637,6 @@ if __name__ == "__main__":
                     else:
                         tweets_files_list = consumer.collect_tweets_by_query_and_save_in_mongo(query=query,until_tweet_id=max_tweet_id)
                 cond = args.loop
-            update_tweets_owner_dict()
-            build_embed_top_tweets_dict()
 
         elif checkParameter(args.collection_users): # -cu option
             cond = True
@@ -624,56 +656,53 @@ if __name__ == "__main__":
 
         elif checkParameter(args.likes): # --likes option
             cond = True
+            now = get_string_datetime_now()
             mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
             driver = twitter_web_consumer.open_twitter_and_login()
             searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
-            users = searched_users_file.keys()
-            likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio)
-            while cond:
-                for user in users:
-                    if user != "_id" and user != "total_captured_tweets":
-                        partido = searched_users_file[user]["partido"]
-                        likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS = get_likes_values(partido)
-                        user_id = mongo_conector.get_user_id_wih_screenname(user)
-                        if user_id != None:
-                            ids = mongo_conector.get_last_n_tweets_of_a_user_in_a_collection(user_id,mongo_conector.current_collection,args.initial_messages or 20)
-                            ## add new tweets to likes queue
-                            likes_queue_of_user = likes_queue[user]["tweet_queue"]
-                            for tweet_id in ids:
-                                if tweet_id > likes_queue_of_user[-1] and tweet_id not in likes_queue[user]:
-                                    likes_queue_of_user.append(tweet_id)
-                                    likes_queue[user][tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
-                            additional_ids_file = mongo_conector.get_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection)
-                            if additional_ids_file != None:
-                                for tweet_id in additional_ids_file:
-                                    if tweet_id > likes_queue_of_user[-1] and tweet_id not in likes_queue[user]:
-                                        likes_queue_of_user.append(tweet_id)
-                                        likes_queue[user][tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
-                            likes_queue[user]["tweet_queue"] = likes_queue_of_user
-
-                            tweet_queue_aux= []
-
-                            for tweet_id in likes_queue_of_user:
-                                num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                                new_likes = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user)
-                                likes_queue[user][tweet_id]["likes_count"] = likes_queue[user][tweet_id]["likes_count"] + len(new_likes)
-                                for u_id,u,u_screen in users_who_liked:
-                                    mongo_conector.insert_or_update_users_file(mongo_conector.current_collection,u_id,u_screen,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS)
-
-                                # delete messages with few likes of the queue
-                                if get_string_datetime_now()>likes_queue[user][tweet_id]["timeout"] and likes_queue[user][tweet_id]["likes_count"]< (args.likes_ratio or 30):
-                                    print("[LIKES] TWEET {} DELETED FROM LIKES QUEUE ({} likes in 30 minutes)".format(tweet_id,likes_queue[user][tweet_id]["likes_count"]))
-                                else:
-                                    tweet_queue_aux.append(tweet_id)
-                            likes_queue[user]["tweet_queue"] = tweet_queue_aux
-                                
-
-                searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+            if searched_users_file!= None:
                 users = searched_users_file.keys()
-                cond = args.loop
-                if cond:
-                    thread = Thread(target=put_additional_doc_in_mongo_with_tweets_ids_of_searched_users_not_captured_yet, args=(searched_users_file,mongo_conector.current_collection,))
-                    thread.start()
+                global_likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio)
+                add_log(now,global_likes_queue)
+                while cond:
+                    # add last n tweets
+                    if not some_users_has_tweets_in_queue(global_likes_queue):
+                        global_likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio)
+                        add_log(now,"\n\n\n\n\nREINITIALIZING QUEUE ...\n\n\n\n\n")
+                    while some_users_has_tweets_in_queue(global_likes_queue):
+                        for user in users:
+                            if user != "_id" and user != "total_captured_tweets":
+                                partido = searched_users_file[user]["partido"]
+                                tupla_likes = get_likes_values(partido)
+                                user_id = mongo_conector.get_user_id_wih_screenname(user)
+                                if user_id != None:
+                                    ## add new tweets to likes queue
+                                    global_likes_queue[user] = add_new_tweets_of_this_user_to_queue(global_likes_queue[user],user_id,user,args.initial_messages)
+                                    tweet_queue_aux=[]
+                                    for tweet_id in global_likes_queue[user]["tweet_queue"]:
+                                        num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
+                                        likes_captured_for_this_tweet = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
+                                        global_likes_queue[user][tweet_id]["likes_count"] = likes_captured_for_this_tweet
+
+                                        # delete messages with few likes of the queue
+                                        if get_string_datetime_now()>global_likes_queue[user][tweet_id]["timeout"] and global_likes_queue[user][tweet_id]["likes_count"]< (args.likes_ratio or 30):
+                                            print("[LIKES] TWEET {} DELETED FROM LIKES QUEUE ({} likes in 30 minutes)".format(tweet_id,global_likes_queue[user][tweet_id]["likes_count"]))
+                                        else:
+                                            tweet_queue_aux.append(tweet_id)
+                                    global_likes_queue[user]["tweet_queue"] = tweet_queue_aux
+
+
+                        searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+                        users = searched_users_file.keys()
+                        cond = args.loop
+                        if cond:
+                            thread = Thread(target=put_additional_doc_in_mongo_with_tweets_ids_of_searched_users_not_captured_yet, args=(searched_users_file,mongo_conector.current_collection,))
+                            thread.start()
+                        add_log(now,global_likes_queue)
+
+            else:
+                print("SEARCHED USER FILE IS NONE")
+            driver.close()
                     #thread.run()
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
         else:

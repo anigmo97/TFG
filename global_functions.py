@@ -56,6 +56,9 @@ def checkParameter(parameter):
     else:
         return 1
 
+def checkOptions(*args):
+    return sum([checkParameter(x) for x in args])
+
 def throw_error(module_name, error_message):
     print("\n\n\n [{}] {}".format(module_name,error_message))
     exit(1)

@@ -41,13 +41,15 @@ def open_twitter_and_login():
 	driver.implicitly_wait(1)
 	login_button  = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[class='submit EdgeButton EdgeButton--primary EdgeButtom--medium']")))
 	accionador.move_to_element(login_button).click().perform()
+	#driver.minimize_window()
 	return driver	
 
 
 def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
 	num_likes = 0
-	result_list = []
+	result_dict = {}
+	error = False
 	try:
 		#chrome_options = Options()  
 		#chrome_options.add_argument("--headless")
@@ -66,21 +68,27 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 		users_who_liked_section = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "ol[class='activity-popup-users dropdown-threshold']")))
 		divs_ultimos_likes = users_who_liked_section.find_elements_by_css_selector("div[class='account  js-actionable-user js-profile-popup-actionable ']")
 		
-		result_list = []
-		for div in divs_ultimos_likes:
-			user_id_str = div.get_attribute('data-user-id')
-			user_name = div.get_attribute('data-name')
-			user_nickname = div.get_attribute('data-screen-name')
-			result_list.append((user_id_str,user_name,user_nickname))
-			# aqui podría capturar la bio del usuario
-
-		for e in range(len(result_list)):
-			print("{} {}".format(e+1,result_list[e]))
 	except Exception as e:
-		print("[get_twitter_user_rts_and_favs ERROR] There was an error")
+		error = True
+		print("[get_twitter_user_rts_and_favs ERROR] There was an error scraping the webpage: {}".format(url))
 		print(e.__cause__)
+
+	if not error:
+		try:
+			for div in divs_ultimos_likes:
+				user_id_str = div.get_attribute('data-user-id')
+				user_name = div.get_attribute('data-name')
+				user_nickname = div.get_attribute('data-screen-name')
+				result_dict[user_id_str]=(user_id_str,user_name,user_nickname)
+				# aqui podría capturar la bio del usuario
+
+			for e,v in range(enumerate(len(result_dict.values()))):
+				print("{} {}".format(e+1,v))
+		except Exception as e:
+			print("[get_twitter_user_rts_and_favs ERROR] There was an error looking div_likes")
+			print(e.__cause__)
 	
-	return num_likes,result_list
+	return num_likes,result_dict
 
 
 def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):
@@ -164,14 +172,14 @@ def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limi
 			print("[ERROR GETTING INFO OF A TWEET OF USER]")
 		if date_limit != False:
 			if int(datatime) < date_limit_epoch:
-				print("break\n\n")
+				print("[get_tweets_of_a_user_until] date limit break\n\n")
 				break
 		if tweet_id_limit !=False:
 			if tweet_id <= tweet_id_limit:
-				print("break\n\n")
+				print("[get_tweets_of_a_user_until] tweet_id_limit break\n\n")
 				break
 		if num_messages_limit != False and i >= num_messages_limit:
-			print("break\n\n")
+			print("[get_tweets_of_a_user_until] break\n\n")
 			break 
 
 
@@ -238,17 +246,20 @@ def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
 			#The element with the html for embed a tweet is not accesible so it's trickery time
 			accionador = webdriver.ActionChains(driver)
 			accionador.double_click(embed_html_text_element).perform()
-			driver.implicitly_wait(10)
+			time.sleep(1)
 			accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform() # do the same of control c
 
 
 			if has_media:
 				embed_with_media = pyperclip.paste()
+				embed_without_media =None
 				media_check_box.click()
-				accionador.double_click(embed_html_text_element).perform()
-				driver.implicitly_wait(10)
-				accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform()
-				embed_without_media = pyperclip.paste()
+				time.sleep(1)
+				while(embed_without_media==None or embed_with_media==embed_without_media):
+					accionador.double_click(embed_html_text_element).perform()
+					accionador.send_keys(Keys.CONTROL , Keys.INSERT).perform()				
+					embed_without_media = pyperclip.paste()
+				
 			else:
 				embed_without_media = pyperclip.paste()
 				embed_with_media = None
@@ -318,33 +329,6 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id,driver):
 
 if __name__ == '__main__':
 	driver = open_twitter_and_login()
-	#print(get_last_users_who_liked_a_tweet('Albert_Rivera', '1100705346291683328'))
-	
-	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL
-	#get_tweets_of_a_user_until("Albert_Rivera")
-	#PRUEBA COGER TODOS LOS MENSAJES DE UN PERFIL HASTA UN TWEET ID
-	
-	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit=1100127150420754438,driver=driver)
-	# print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
-
-	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",tweet_id_limit="1100127150420754438",driver=driver)
-	# print("Limited list len = {}\n".format(len(limited_list[0])+len(limited_list[1])))
-
-	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=1551125726,driver=driver)
-	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
-
-	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit="25/02/2019",driver=driver)
-	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
-
-	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",date_limit=datetime.datetime(2019,2,25,0,0,0),driver=driver)
-	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
-
-	# limited_list = get_tweets_of_a_user_until("Albert_Rivera",num_messages_limit=10,driver=driver)
-	# print("Limited list len = {}".format(len(limited_list[0])+len(limited_list[1])))
-
-	# print(limited_list)
-
-
 	get_embed_html_of_a_tweet(screen_name="Albert_Rivera",tweet_id="1100127150420754438",driver=driver)
 
 	driver.close()
