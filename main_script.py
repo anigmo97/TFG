@@ -255,8 +255,9 @@ def build_embed_top_tweets_dict():
                     global_variables.tweets_embed_html_dict[tweet_id] = aux
     driver.close()
 
-def initialize_likes_queue(users,collection,initial_messages,likes_ratio):
+def initialize_likes_queue(users,collection,initial_messages,likes_ratio,driver):
     likes_queue_dict = {}
+    searched_users_file = mongo_conector.get_searched_users_file(collection)
     for user in users:
         if user != "_id" and user != "total_captured_tweets":
             user_registry = { }
@@ -470,6 +471,105 @@ def get_likes_values(partido):
         return (0,0,0,0,0,0)
     return val
 
+def execute_likes_option_with_queues():
+    cond = True
+    now = get_string_datetime_now()
+    mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
+    driver = twitter_web_consumer.open_twitter_and_login()
+    searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+    if searched_users_file!= None:
+        users = searched_users_file.keys()
+        global_likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio,driver)
+        add_log(now,global_likes_queue)
+        while cond:
+            # add last n tweets
+            if not some_users_has_tweets_in_queue(global_likes_queue):
+                global_likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio,driver)
+                add_log(now,"\n\n\n\n\nREINITIALIZING QUEUE ...\n\n\n\n\n")
+            while some_users_has_tweets_in_queue(global_likes_queue):
+                for user in users:
+                    if user != "_id" and user != "total_captured_tweets":
+                        partido = searched_users_file[user]["partido"]
+                        tupla_likes = get_likes_values(partido)
+                        user_id = mongo_conector.get_user_id_wih_screenname(user)
+                        if user_id != None:
+                            ## add new tweets to likes queue
+                            global_likes_queue[user] = add_new_tweets_of_this_user_to_queue(global_likes_queue[user],user_id,user,args.initial_messages)
+                            tweet_queue_aux=[]
+                            for tweet_id in global_likes_queue[user]["tweet_queue"]:
+                                num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
+                                likes_captured_for_this_tweet = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
+                                global_likes_queue[user][tweet_id]["likes_count"] = likes_captured_for_this_tweet
+
+                                # delete messages with few likes of the queue
+                                if get_string_datetime_now()>global_likes_queue[user][tweet_id]["timeout"] and global_likes_queue[user][tweet_id]["likes_count"]< (args.likes_ratio or 30):
+                                    print("[LIKES] TWEET {} DELETED FROM LIKES QUEUE ({} likes in 30 minutes)".format(tweet_id,global_likes_queue[user][tweet_id]["likes_count"]))
+                                else:
+                                    tweet_queue_aux.append(tweet_id)
+                            global_likes_queue[user]["tweet_queue"] = tweet_queue_aux
+
+
+                searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+                users = searched_users_file.keys()
+                cond = args.loop
+                if cond:
+                    thread = Thread(target=put_additional_doc_in_mongo_with_tweets_ids_of_searched_users_not_captured_yet, args=(searched_users_file,mongo_conector.current_collection,))
+                    thread.start()
+                add_log(now,global_likes_queue)
+
+    else:
+        print("SEARCHED USER FILE IS NONE")
+    driver.close()
+
+def capture_likes_clicking_on_timeline(users_list,searched_users_file,last_n):
+    driver = twitter_web_consumer.open_twitter_and_login()
+    for user in users_list:
+        partido = searched_users_file[user]["partido"]
+        tupla_likes = get_likes_values(partido)
+        user_id = mongo_conector.get_user_id_wih_screenname(user)
+        users_tweets_dict = twitter_web_consumer.get_last_users_who_like_last_n_tweets_of_user(user,last_n,driver)
+        for tweet_id,(num_likes,users_who_liked) in users_tweets_dict.items():
+            likes_captured_for_this_tweet = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
+    driver.close()
+
+def capture_likes_loading_each_tweet_page(users_list,searched_users_file,last_n):
+    driver = twitter_web_consumer.open_twitter_and_login()
+    for user in users_list:
+        tweets_list,retweets_list = twitter_web_consumer.get_tweets_of_a_user_until(user,driver,num_messages_limit=last_n)
+        partido = searched_users_file[user]["partido"]
+        tupla_likes = get_likes_values(partido)
+        user_id = mongo_conector.get_user_id_wih_screenname(user)
+        for id_mensaje in tweets_list+retweets_list:
+            num_likes,result_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,id_mensaje,driver)
+            mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,id_mensaje,num_likes,result_dict,user_id,user,tupla_likes)
+    driver.close()
+
+def execute_likes_option_with_threads():
+    cond = True
+    now = get_string_datetime_now()
+    mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
+    searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+    if searched_users_file!= None:
+        users = searched_users_file.keys()
+        while cond:
+            users_repartition = [[],[],[],[],[],[]]
+            threads_list = []
+            i=0
+            for user in searched_users_file:
+                if user != "_id" and user != "total_captured_tweets":
+                    i+=1
+                    users_repartition[i%6].append(user)
+            for users_list in users_repartition:
+                if len(users_list)>0:
+                    threads_list.append(Thread(target=capture_likes_loading_each_tweet_page, args=(users_list,searched_users_file,args.initial_messages,)))
+                    threads_list[-1].start()
+            for thread in threads_list:
+                thread.join()
+            cond = args.loop
+    else:
+        print("SEARCHED USER FILE IS NONE")
+
+
 #############################################################################################################################
 ######################       MAIN PROGRAM       #############################################################################
 #############################################################################################################################
@@ -655,54 +755,8 @@ if __name__ == "__main__":
                 cond = args.loop
 
         elif checkParameter(args.likes): # --likes option
-            cond = True
-            now = get_string_datetime_now()
-            mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
-            driver = twitter_web_consumer.open_twitter_and_login()
-            searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
-            if searched_users_file!= None:
-                users = searched_users_file.keys()
-                global_likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio)
-                add_log(now,global_likes_queue)
-                while cond:
-                    # add last n tweets
-                    if not some_users_has_tweets_in_queue(global_likes_queue):
-                        global_likes_queue = initialize_likes_queue(users,mongo_conector.current_collection,args.initial_messages,args.likes_ratio)
-                        add_log(now,"\n\n\n\n\nREINITIALIZING QUEUE ...\n\n\n\n\n")
-                    while some_users_has_tweets_in_queue(global_likes_queue):
-                        for user in users:
-                            if user != "_id" and user != "total_captured_tweets":
-                                partido = searched_users_file[user]["partido"]
-                                tupla_likes = get_likes_values(partido)
-                                user_id = mongo_conector.get_user_id_wih_screenname(user)
-                                if user_id != None:
-                                    ## add new tweets to likes queue
-                                    global_likes_queue[user] = add_new_tweets_of_this_user_to_queue(global_likes_queue[user],user_id,user,args.initial_messages)
-                                    tweet_queue_aux=[]
-                                    for tweet_id in global_likes_queue[user]["tweet_queue"]:
-                                        num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                                        likes_captured_for_this_tweet = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
-                                        global_likes_queue[user][tweet_id]["likes_count"] = likes_captured_for_this_tweet
-
-                                        # delete messages with few likes of the queue
-                                        if get_string_datetime_now()>global_likes_queue[user][tweet_id]["timeout"] and global_likes_queue[user][tweet_id]["likes_count"]< (args.likes_ratio or 30):
-                                            print("[LIKES] TWEET {} DELETED FROM LIKES QUEUE ({} likes in 30 minutes)".format(tweet_id,global_likes_queue[user][tweet_id]["likes_count"]))
-                                        else:
-                                            tweet_queue_aux.append(tweet_id)
-                                    global_likes_queue[user]["tweet_queue"] = tweet_queue_aux
-
-
-                        searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
-                        users = searched_users_file.keys()
-                        cond = args.loop
-                        if cond:
-                            thread = Thread(target=put_additional_doc_in_mongo_with_tweets_ids_of_searched_users_not_captured_yet, args=(searched_users_file,mongo_conector.current_collection,))
-                            thread.start()
-                        add_log(now,global_likes_queue)
-
-            else:
-                print("SEARCHED USER FILE IS NONE")
-            driver.close()
+            #execute_likes_option_with_queues()
+            execute_likes_option_with_threads()
                     #thread.run()
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s]
         else:

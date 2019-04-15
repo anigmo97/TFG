@@ -543,6 +543,7 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         aux["num_likes"] = num_likes
         aux["last_like_resgistered"] = str(datetime.now())
         aux["num_likes_capturados"] = len(aux["users_who_liked"])
+        aux["veces_recorrido"] = 1
         special_doc_dict[tweet_id]= aux
     else:
         print("[INSERT OR UPDATE {0} INFO] Query is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
@@ -555,6 +556,7 @@ def insert_or_update_likes_list_file(collection,tweet_id,num_likes,users_who_lik
         aux["num_likes"] = num_likes
         aux["num_likes_capturados"] = len(aux["users_who_liked"])
         aux["last_like_resgistered"] = str(datetime.now())
+        aux["veces_recorrido"] = aux.get("veces_recorrido",1)+1
         special_doc_dict[tweet_id] = aux
 
 

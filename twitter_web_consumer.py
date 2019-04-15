@@ -90,7 +90,7 @@ def look_into_likes_list(driver):
 			print(e.__cause__)
 		return num_likes,result_dict
 	else:
-		return False,False
+		return 0,{}
 	
 
 def print_cursor_position(driver):
@@ -433,7 +433,7 @@ def get_last_users_who_like_last_n_tweets_of_user(user_screen_name,num_tweets,dr
 		try:
 			boton_likes = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
 			num_likes,resut_dict = look_into_likes_list(driver)
-			if num_likes!= False :
+			if num_likes!= 0 :
 				final_dict[tweet_id] = (num_likes,resut_dict)
 			close_favs_section(driver)
 			close_tweet(driver)
@@ -441,8 +441,7 @@ def get_last_users_who_like_last_n_tweets_of_user(user_screen_name,num_tweets,dr
 			if driver.current_url != url:
 				driver.get(url)
 			
-	
-	print(final_dict)
+	return final_dict
 		
 	
 

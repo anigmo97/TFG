@@ -1,8 +1,8 @@
 #!/bin/bash
 
 LIKES_PER_30_MIN_RATIO=30
-INITIAL_TWEETS=10
-COLECCION="test2"
+INITIAL_TWEETS=20
+COLECCION="test3"
 
 
 POLITICOS_PP="@populares @ppcv @pablocasado_ @TeoGarciaEgea @Rafa_Hernando @DolorsMM @Ignacos @Albiol_XG @ALevySoler @IdiazAyuso"
