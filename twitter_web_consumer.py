@@ -18,7 +18,12 @@ import datetime
 
 driver = None
 
+
+#####################################################################################################
+############################## TWITTER DRIVER INIZIALIZATION ########################################
+#####################################################################################################
 def open_twitter_and_login():
+	""" Open a chrome window and sign in on twitter"""
 	driver = webdriver.Chrome(ChromeDriverManager().install())
 	
 	i=0
@@ -44,33 +49,29 @@ def open_twitter_and_login():
 	#driver.minimize_window()
 	return driver	
 
-
-def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
-	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
-	num_likes = 0
+#####################################################################################################
+################ AUXILIAR METHODS (NEEDS A DRIVER IN THE CORRECT URL) ###############################
+#####################################################################################################
+def look_into_likes_list(driver):
+	"""Auxiliar method used for others\n
+		gets a driver that has to be in tweet url already\n
+		and click in likes secction to get last users who liked list
+	"""
+	error=False
 	result_dict = {}
-	error = False
+	num_likes = 0
+	time.sleep(0.2)
 	try:
-		#chrome_options = Options()  
-		#chrome_options.add_argument("--headless")
-
-		driver.get(url)	
-	except Exception as e:
-		print("[get_twitter_user_rts_and_favs ERROR] Error conecting")
-		print(e)
-		exit(1)
-	
-	try:
-		boton_likes = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
+		boton_likes = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
 		num_likes = boton_likes.text
 		num_likes = num_likes.split()[0]
 		boton_likes.click()
-		users_who_liked_section = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "ol[class='activity-popup-users dropdown-threshold']")))
+		users_who_liked_section = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "ol[class='activity-popup-users dropdown-threshold']")))
 		divs_ultimos_likes = users_who_liked_section.find_elements_by_css_selector("div[class='account  js-actionable-user js-profile-popup-actionable ']")
 		
 	except Exception as e:
 		error = True
-		print("[get_twitter_user_rts_and_favs ERROR] There was an error scraping the webpage: {}".format(url))
+		print("[get_twitter_user_rts_and_favs ERROR] There was an error scraping the webpage: {}".format(driver.current_url))
 		print(e.__cause__)
 
 	if not error:
@@ -82,16 +83,70 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 				result_dict[user_id_str]=(user_id_str,user_name,user_nickname)
 				# aqui podría capturar la bio del usuario
 
-			for e,v in range(enumerate(len(result_dict.values()))):
-				print("{} {}".format(e+1,v))
+			# for e,v in range(enumerate(len(result_dict.values()))):
+			# 	print("{} {}".format(e+1,v))
 		except Exception as e:
 			print("[get_twitter_user_rts_and_favs ERROR] There was an error looking div_likes")
 			print(e.__cause__)
+		return num_likes,result_dict
+	else:
+		return False,False
 	
-	return num_likes,result_dict
+
+def print_cursor_position(driver):
+	y = driver.execute_script('return window.pageYOffset;')
+	x = driver.execute_script('return window.pageXOffset;')
+	print("( {} , {} )".format(x,y))
+
+
+def close_favs_section(driver):
+	accionador = webdriver.ActionChains(driver)
+	time.sleep(0.2)
+	boton_cerrar = driver.find_element(By.CSS_SELECTOR,".modal-btn.modal-close.js-close")
+	accionador.click(boton_cerrar).perform()
+	# print("likes_closed")
+	# input()
+
+def close_tweet(driver):
+	accionador = webdriver.ActionChains(driver)
+	time.sleep(0.2)
+	boton_cerrar = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR,"#permalink-overlay > div.PermalinkProfile-dismiss.modal-close-fixed > span")))
+	accionador.click(boton_cerrar).perform()
+	# print("tweet_closed")
+	# input()
+
+
+#####################################################################################################
+################ MAIN METHODS (NEEDS A DRIVER WITH TWITTER INITIALIZED)  ############################
+#####################################################################################################
+
+def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
+	""" 
+		Return actual num of likes of a tweet and a dict with the last 25 users who liked a tweet
+		The key is the user screen_name
+		The value has the form (id,name,nickname)
+	"""
+
+	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
+	num_likes = 0
+	error = False
+	try:
+		#chrome_options = Options()  
+		#chrome_options.add_argument("--headless")
+
+		driver.get(url)	
+	except Exception as e:
+		print("[get_twitter_user_rts_and_favs ERROR] Error conecting")
+		print(e)
+		exit(1)
+	
+
+	return look_into_likes_list(driver)
+
 
 
 def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limit=False,num_messages_limit=False,show=False):
+	""" Returns a tuple with tweets and retweets of a user until an specified limit """
 
 	url = 'https://twitter.com/' + screen_name
 	
@@ -208,7 +263,9 @@ def get_tweets_of_a_user_until(screen_name,driver,date_limit=False,tweet_id_limi
 	return (lista_tweets,lista_retweets)
 
 
+
 def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
+	""" Given an tweet_url return a tuple with html code whith embed tweet with and without media"""
 	url = 'https://twitter.com/' + screen_name + '/status/' + tweet_id
 	print("[URL] {}".format(url))
 	error = False
@@ -281,9 +338,10 @@ def get_embed_html_of_a_tweet(screen_name, tweet_id,driver):
 	return None,None
 
 
+
 #returns list(retweet users),list(favorite users) for a given screen_name and status_id
 def get_twitter_user_rts_and_favs_v1(screen_name, status_id,driver):
-
+	"""Returns a tuple with last users who retweeted and liked"""
 
 	url = urllib.request.urlopen('https://twitter.com/' + screen_name + '/status/' + status_id)
 	root = parse(url).getroot()
@@ -326,9 +384,75 @@ def get_twitter_user_rts_and_favs_v1(screen_name, status_id,driver):
 
 
 
+def get_last_users_who_like_last_n_tweets_of_user(user_screen_name,num_tweets,driver):
+	"""
+	Given a user_screename and a num_tweets.\n 
+	Returns a dict with the last n tweets_ids of this user as keys\n
+	The values of this dict will be a tuple formed by :
+		- Current total likes num of this tweet
+		- Dict[user_screen_name] -> (id,name,nickname)
+	"""
+
+	url = 'https://twitter.com/' + user_screen_name
+	#driver.execute_script("document.body.style.zoom='20%'")
+	driver.get(url)
+	accionador = webdriver.ActionChains(driver)
+	fin = False
+	while not fin:
+		height = driver.execute_script("return document.documentElement.scrollHeight")
+		driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+		
+		stream_items_ol = driver.find_element_by_id("stream-items-id")
+		stream_items = stream_items_ol.find_elements_by_css_selector(".js-stream-item.stream-item.stream-item")
+
+		#stop scrolling and looping
+		if len(stream_items)>num_tweets:
+			fin = True
+		elif height == driver.execute_script("return document.documentElement.scrollHeight"):
+			print("Bottom REACHED")
+			#TODO wait two reaches to exit
+			fin=True
+	time.sleep(1)
+
+	stream_items_ol = driver.find_element_by_id("stream-items-id")
+	stream_items = stream_items_ol.find_elements_by_css_selector(".js-stream-item.stream-item.stream-item")
+	WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#stream-items-id:first-child")))
+	final_dict={}
+	for e in stream_items[0:num_tweets]:
+		tweet_id = e.get_attribute("data-item-id")
+		container_id = e.get_attribute("id")
+		try:
+			WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR,"#{} > div > div.content > div.js-tweet-text-container > p".format(container_id))))
+			texto = e.find_element(By.CSS_SELECTOR,"#{} > div > div.content > div.js-tweet-text-container".format(container_id))
+			print(tweet_id)
+			print(texto.text)
+			texto.click()
+		except:
+			print("ERROR clicking on tweet {}".format(tweet_id))
+
+		try:
+			boton_likes = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, "li[class='js-stat-count js-stat-favorites stat-count']")))
+			num_likes,resut_dict = look_into_likes_list(driver)
+			if num_likes!= False :
+				final_dict[tweet_id] = (num_likes,resut_dict)
+			close_favs_section(driver)
+			close_tweet(driver)
+		except:
+			if driver.current_url != url:
+				driver.get(url)
+			
+	
+	print(final_dict)
+		
+	
+
+
+
 
 if __name__ == '__main__':
 	driver = open_twitter_and_login()
-	get_embed_html_of_a_tweet(screen_name="Albert_Rivera",tweet_id="1100127150420754438",driver=driver)
-
+	#get_embed_html_of_a_tweet(screen_name="Albert_Rivera",tweet_id="1100127150420754438",driver=driver)
+	time_init = datetime.datetime.now()
+	get_last_users_who_like_last_n_tweets_of_user("Albert_Rivera",10,driver)
+	print(datetime.datetime.now()-time_init)
 	driver.close()
