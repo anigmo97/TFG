@@ -1,3 +1,4 @@
+# encoding: utf-8
 import tweepy
 import datetime
 import json

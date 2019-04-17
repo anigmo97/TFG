@@ -1,3 +1,4 @@
+# encoding: utf-8
 import global_variables
 import os
 from datetime import datetime,timedelta

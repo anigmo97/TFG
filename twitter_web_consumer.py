@@ -1,3 +1,4 @@
+# encoding: utf-8
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -77,10 +78,13 @@ def look_into_likes_list(driver):
 	if not error:
 		try:
 			for div in divs_ultimos_likes:
+				aux={}
 				user_id_str = div.get_attribute('data-user-id')
-				user_name = div.get_attribute('data-name')
-				user_nickname = div.get_attribute('data-screen-name')
-				result_dict[user_id_str]=(user_id_str,user_name,user_nickname)
+				aux["user_id"] = user_id_str
+				aux["user_name"] = div.get_attribute('data-name')
+				aux["user_screen_name"] = div.get_attribute('data-screen-name')
+				aux["counted"] = False
+				result_dict[user_id_str]=aux
 				# aqui podría capturar la bio del usuario
 
 			# for e,v in range(enumerate(len(result_dict.values()))):
@@ -142,6 +146,28 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 	
 
 	return look_into_likes_list(driver)
+
+def get_last_users_who_liked_a_tweet_without_navegator(screen_name, tweet_id):
+	html = urllib.request.urlopen('https://twitter.com/'+screen_name+'/status/'+tweet_id)
+	soup = BeautifulSoup(html.read(),'html.parser')
+	try:
+		likes_section = soup.select_one(".avatar-row.js-face-pile-container")
+		num_likes = soup.select_one(".js-stat-count.js-stat-favorites.stat-count > a")["data-tweet-stat-count"]
+		result_dict={}
+		for e in likes_section.select("a"):
+			aux={}
+			aux["user_screen_name"] = e["href"][1:]
+			aux["user_id"] = e["data-user-id"]
+			aux["user_name"] = e["original-title"]
+			aux["counted"] = False
+			result_dict[e["data-user-id"]]=aux
+		print("{} likes capturados de {}".format(len(likes_section.select("a")),num_likes))
+		return num_likes,result_dict
+	except:
+		print("Error scraping webpage without navegator {}".format('https://twitter.com/'+screen_name+'/status/'+tweet_id))
+		return 0,{}
+	
+	
 
 
 
@@ -449,9 +475,11 @@ def get_last_users_who_like_last_n_tweets_of_user(user_screen_name,num_tweets,dr
 
 
 if __name__ == '__main__':
-	driver = open_twitter_and_login()
+	#driver = open_twitter_and_login()
 	#get_embed_html_of_a_tweet(screen_name="Albert_Rivera",tweet_id="1100127150420754438",driver=driver)
 	time_init = datetime.datetime.now()
-	get_last_users_who_like_last_n_tweets_of_user("Albert_Rivera",10,driver)
+	#get_last_users_who_like_last_n_tweets_of_user("Albert_Rivera",10,driver)
+	print(get_last_users_who_liked_a_tweet_without_navegator("Albert_Rivera","1118120339937136641"))
+	#print(soup)
 	print(datetime.datetime.now()-time_init)
-	driver.close()
+	#driver.close()

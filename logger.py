@@ -1,3 +1,4 @@
+# encoding: utf-8
 from global_functions import get_top_user,show_date_dicctionary,show_date_dicctionary_simple,print_num_tweets_per_date,print_all_top_ten_lists
 import global_variables
 #from global_variables import *     (imports variables)

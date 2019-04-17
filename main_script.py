@@ -1,3 +1,4 @@
+# encoding: utf-8
 import argparse
 import json
 from re import findall
@@ -15,6 +16,7 @@ import twitter_web_consumer
 import mongo_conector
 from threading import Thread
 from time import sleep
+import datetime
 
 
 patron_way_of_send = u"rel(.*)>([\s\S]*?)<(.*)"
@@ -241,7 +243,7 @@ def build_embed_top_tweets_dict():
             
 
             if registry_dict == None: # guardar los tweets respondidos y citados en owner_dict
-                print("[REVISAR] tweet_id = {} (no tenemos su dueño) ".format(tweet_id))
+                print("[REVISAR] tweet_id = {} (no tenemos su propietario)".format(tweet_id))
             else:
                 user_screen_name = registry_dict["user_screen_name"]
                 embed_with_media,embed_without_media = twitter_web_consumer.get_embed_html_of_a_tweet(user_screen_name,tweet_id,driver)
@@ -264,7 +266,7 @@ def initialize_likes_queue(users,collection,initial_messages,likes_ratio,driver)
             tweet_queue = []
             partido = searched_users_file[user]["partido"]
             tupla_likes = get_likes_values(partido)
-            user_id = mongo_conector.get_user_id_wih_screenname(user)
+            user_id = mongo_conector.get_searched_user_id_with_screenname(user)
             if user_id != None:
                 ids = mongo_conector.get_last_n_tweets_of_a_user_in_a_collection(user_id,mongo_conector.current_collection,args.initial_messages or 20)
                 for tweet_id in ids:
@@ -272,7 +274,7 @@ def initialize_likes_queue(users,collection,initial_messages,likes_ratio,driver)
                     # We don't count the first likes retrieve
                     user_registry[tweet_id] = { "likes_count":0 , "timeout": get_string_datetime_with_n_min_more_than_now(30)}
                     num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                    mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked_dict,user_id,user,tupla_likes)
+                    mongo_conector.insert_or_update_one_registry_of_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked_dict,user_id,user,tupla_likes)
             user_registry["tweet_queue"] = tweet_queue
             likes_queue_dict[user] = user_registry
     # print(likes_queue_dict)
@@ -491,14 +493,14 @@ def execute_likes_option_with_queues():
                     if user != "_id" and user != "total_captured_tweets":
                         partido = searched_users_file[user]["partido"]
                         tupla_likes = get_likes_values(partido)
-                        user_id = mongo_conector.get_user_id_wih_screenname(user)
+                        user_id = mongo_conector.get_searched_user_id_with_screenname(user)
                         if user_id != None:
                             ## add new tweets to likes queue
                             global_likes_queue[user] = add_new_tweets_of_this_user_to_queue(global_likes_queue[user],user_id,user,args.initial_messages)
                             tweet_queue_aux=[]
                             for tweet_id in global_likes_queue[user]["tweet_queue"]:
                                 num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
-                                likes_captured_for_this_tweet = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
+                                likes_captured_for_this_tweet = mongo_conector.insert_or_update_one_registry_of_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
                                 global_likes_queue[user][tweet_id]["likes_count"] = likes_captured_for_this_tweet
 
                                 # delete messages with few likes of the queue
@@ -526,26 +528,43 @@ def capture_likes_clicking_on_timeline(users_list,searched_users_file,last_n):
     for user in users_list:
         partido = searched_users_file[user]["partido"]
         tupla_likes = get_likes_values(partido)
-        user_id = mongo_conector.get_user_id_wih_screenname(user)
+        user_id = mongo_conector.get_searched_user_id_with_screenname(user)
         users_tweets_dict = twitter_web_consumer.get_last_users_who_like_last_n_tweets_of_user(user,last_n,driver)
         for tweet_id,(num_likes,users_who_liked) in users_tweets_dict.items():
-            likes_captured_for_this_tweet = mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
+            likes_captured_for_this_tweet = mongo_conector.insert_or_update_one_registry_of_likes_list_file(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
     driver.close()
 
 def capture_likes_loading_each_tweet_page(users_list,searched_users_file,last_n):
-    driver = twitter_web_consumer.open_twitter_and_login()
-    for user in users_list:
-        tweets_list,retweets_list = twitter_web_consumer.get_tweets_of_a_user_until(user,driver,num_messages_limit=last_n)
-        partido = searched_users_file[user]["partido"]
-        tupla_likes = get_likes_values(partido)
-        user_id = mongo_conector.get_user_id_wih_screenname(user)
-        for id_mensaje in tweets_list+retweets_list:
-            num_likes,result_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,id_mensaje,driver)
-            mongo_conector.insert_or_update_likes_list_file(mongo_conector.current_collection,id_mensaje,num_likes,result_dict,user_id,user,tupla_likes)
-    driver.close()
+    
+    cond = True
+    while cond:
+        driver = twitter_web_consumer.open_twitter_and_login()
+        likes_list_file_aux={}
+        initial_time = datetime.datetime.now()
+        for user in users_list:
+            tweets_list,retweets_list = twitter_web_consumer.get_tweets_of_a_user_until(user,driver,num_messages_limit=last_n)
+            partido = searched_users_file[user]["partido"]
+            tupla_likes = get_likes_values(partido)
+            user_id = mongo_conector.get_searched_user_id_with_screenname(user)
+            for id_mensaje in tweets_list+retweets_list:
+                #num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,id_mensaje,driver)
+                num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet_without_navegator(user,id_mensaje)
+                aux={}
+                aux["num_likes"]=num_likes
+                aux["user_id"] = user_id
+                aux["user_screen_name"] = user
+                aux["users_who_liked"] = users_who_liked_dict
+                aux["tweet_id"]=id_mensaje
+                aux["last_like_resgistered"]= get_string_datetime_now()
+                likes_list_file_aux[id_mensaje] = aux
+        print("[THREAD INFO] LOOP COMPLETED IN {}".format(datetime.datetime.now()-initial_time))
+        mongo_conector.insert_or_update_multiple_registries_of_likes_list_file(likes_list_file_aux,mongo_conector.current_collection)
+        driver.close()
+        cond =args.loop
 
 def execute_likes_option_with_threads():
     cond = True
+    mongo_conector.insert_likes_file_list_if_not_exists(mongo_conector.current_collection)
     now = get_string_datetime_now()
     mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
     searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
@@ -560,12 +579,13 @@ def execute_likes_option_with_threads():
                     i+=1
                     users_repartition[i%6].append(user)
             for users_list in users_repartition:
+                # capture_likes_loading_each_tweet_page(users_list,searched_users_file,args.initial_messages)
                 if len(users_list)>0:
                     threads_list.append(Thread(target=capture_likes_loading_each_tweet_page, args=(users_list,searched_users_file,args.initial_messages,)))
                     threads_list[-1].start()
             for thread in threads_list:
                 thread.join()
-            cond = args.loop
+            cond = False
     else:
         print("SEARCHED USER FILE IS NONE")
 
@@ -580,7 +600,7 @@ if __name__ == "__main__":
     parser.add_argument("-f", "-F","--file", help="input json file",type=str)
     parser.add_argument("-d","-D","--directory", help="directory of input json files", type=str)
     parser.add_argument("-dd","-DD","--directory_of_directories", help="father directory of json directories", type=str)
-    #TODO añadir mdb option
+    #TODO anyadir mdb option
 
     parser.add_argument("-o","-O","--output_file",help="choose name for file with results", type=str)
 

@@ -1,3 +1,4 @@
+# encoding: utf-8
 def create_top_ten_list():
     return [(0,0)] * 10
 	
@@ -22,6 +23,7 @@ retweets_without_replies_count = 0
 retweets_with_quotes_count = 0
 retweets_without_quotes_count = 0
 retweets_with_replies_and_quotes_count = 0
+threads_syncro = []
 
 #quote tweet
 #entities	(hashtags,media,urls,user_mentions,symbols)
