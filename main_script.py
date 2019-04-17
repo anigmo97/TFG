@@ -556,9 +556,10 @@ def capture_likes_loading_each_tweet_page(users_list,searched_users_file,last_n)
                 aux["users_who_liked"] = users_who_liked_dict
                 aux["tweet_id"]=id_mensaje
                 aux["last_like_resgistered"]= get_string_datetime_now()
+                aux["veces_recorrido"] = 0
                 likes_list_file_aux[id_mensaje] = aux
         print("[THREAD INFO] LOOP COMPLETED IN {}".format(datetime.datetime.now()-initial_time))
-        mongo_conector.insert_or_update_multiple_registries_of_likes_list_file(likes_list_file_aux,mongo_conector.current_collection)
+        mongo_conector.insert_or_update_likes_info_in_docs(likes_list_file_aux,mongo_conector.current_collection)
         driver.close()
         cond =args.loop
 

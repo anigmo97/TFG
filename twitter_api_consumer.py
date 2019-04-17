@@ -65,7 +65,7 @@ class StreamListener(tweepy.StreamListener):
         print("[ON DISCONNECT INFO] You are now disconnected to the streaming API.\n\n")
         if len (self.mongo_tweets_ids_list)>0:
             #coger lo que retorna el insert many
-            tweets_no_reps = mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
+            tweets_no_reps = mongo_conector.insertar_multiples_tweets_en_mongo_v2(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
             mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,len(tweets_no_reps),self.first_tweet_id,self.last_tweet_id,self.min_created_at, self.max_created_at)
             print("[ON DISCONNECT INFO] FINISH")
         
@@ -108,7 +108,7 @@ class StreamListener(tweepy.StreamListener):
                 self.mongo_tweets_ids_list.append(datajson["_id"])
                 if len(self.mongo_tweets_ids_list) > self.trunk:
                     print("[ON DATA INFO] {} messages are going to be inserted in mongo".format(len(self.mongo_tweets_ids_list)))
-                    self.tweets_no_repetidos = mongo_conector.insertar_multiples_tweets_en_mongo(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
+                    self.tweets_no_repetidos = mongo_conector.insertar_multiples_tweets_en_mongo_v2(self.mongo_tweets_dict,self.mongo_tweets_ids_list,mongo_conector.current_collection) # cambiar por insert many
                     mongo_conector.insert_or_update_query_file_streamming(mongo_conector.current_collection,self.words_list,len(self.tweets_no_repetidos),self.first_tweet_id,current_tweet_id,self.min_created_at, current_created_at)
                     self.mongo_tweets_dict = {}
                     self.mongo_tweets_ids_list = []
@@ -219,7 +219,7 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
         min_creation_date = mongo_tweets_dict[min_tweet_id]["created_at"]
         max_creation_date = mongo_tweets_dict[max_tweet_id]["created_at"]
 
-        tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
+        tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo_v2(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
         print("{} tweets nuevos capturados ".format(len(tweets_sin_repetir)))
 
         user_id = API.get_user(screen_name = user_screen_name).id_str
