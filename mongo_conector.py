@@ -29,16 +29,63 @@ tweet_of_searched_users_not_captured_yet_file_id = "tweet_of_searched_users_not_
 special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,users_file_id,tweet_of_searched_users_not_captured_yet_file_id]
 
 
+########################### FIELDS ADDED TO TWEETS #######################################
+def get_additional_tweet_fields():
+    """Returns a dict with fields to set in a tweet before insert it"""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    aux = {}
+    aux["first_capture"] = now
+    aux["last_update"] = now
+    aux["has_likes_info"] = False
+    return aux
+
+def get_likes_info_registry(tweet_id,users_who_liked_dict,num_likes,author_screen_name,author_id):
+    aux = {
+        "tweet_id" : tweet_id,
+        "users_who_liked" : users_who_liked_dict,
+        "num_likes_capturados" : len(users_who_liked_dict),
+        "num_likes" : num_likes,
+        "last_like_resgistered" : str(datetime.now()),
+        "veces_recorrido" : 1,
+        "user_screen_name" : author_screen_name,
+        "user_id" : author_id,
+        "likes_count_updated":False
+        }
+    return aux
+
+def get_tmp_likes_file_dict(tweet_id,likes_info_registry):
+    if tweet_id.endswith("_tmp"):
+        tweet_id = tweet_id[-4]
+    aux = {
+        "_id":tweet_id+"_tmp",
+        "id_str":tweet_id+"_tmp",
+        "has_likes_info" : True, 
+        "likes_info":likes_info_registry , 
+        "last_update": "--", 
+        "created_at":"--",
+        "user":{
+            "screen_name":likes_info_registry["user_screen_name"]
+            }
+        }
+    return aux
+               
+
+
+
 ##########################################################################################
 ##################################### AUXILIAR ###########################################
 ##########################################################################################
 def replace_bullet_with_dot(word):
+    """Returns the string given replacing '•' for '.' """
     return word.replace('•','.')
 
 def replace_dot_with_bullet(word):
+    """Returns the string given replacing '.' for '•' """
     return word.replace('.','•') 
 
 def change_dot_in_keys_for_bullet(dicctionary):
+    """Returns a diccionary given replacing '.' in its keys for '•'\n
+        This is necesarry to save the dict in mngo because mongo does not allow use keys with '.'"""
     new_dict = {}
     for k,v in dicctionary.items():
         if "." in k:
@@ -50,6 +97,7 @@ def change_dot_in_keys_for_bullet(dicctionary):
     return new_dict
 
 def change_bullet_in_keys_for_dot(dicctionary):
+    """Returns a diccionary given replacing '•' in its keys for '.'"""
     new_dict = {}
     for k,v in dicctionary.items():
         if "•" in k:
@@ -72,6 +120,16 @@ def change_bullet_in_keys_for_dot(dicctionary):
 def get_count_of_a_collection(collection):
     """returns the num of doc (including special docs) from a collection"""
     return db[collection].count()
+
+def get_likes_count_of_a_collection(collection):
+    mongo_cursor = db[collection].find({'_id':{"$nin":special_doc_ids}})
+    counter = 0
+    for doc in mongo_cursor:
+        likes_info = doc.get("likes_info",False)
+        if likes_info:
+            counter+= len(likes_info.get("users_who_liked",[]))
+    return counter
+
 
 def get_tweet_ids_list_from_database(collection):
     """returns a list with docs_ids (tweets_ids)\n
@@ -170,6 +228,12 @@ def get_tweets_to_analyze_or_update_stats(collection,limit=0):
     print("[TWEETS FOR ANALYZE] {} tweets retrieved".format(len(lista_tweets)))
     return lista_tweets
 
+def get_tweets_to_count_likes(collection,limit=0):
+    """Returns a list of tweets from the collection that have its 'likes_info.likes_count_updated' field set to False"""
+    lista_tweets = list(db[collection].find({"has_likes_info" : True,"likes_info.likes_count_updated":False ,'_id': {'$nin': special_doc_ids }}).limit(limit))
+    print("[TWEETS FOR COUNT LIKES] {} tweets retrieved".format(len(lista_tweets)))
+    return lista_tweets
+
 
 def get_tweet_owner_dict_data_of_tweet_ids(tweet_id_list,collection):
     """Given a tweets_ids list and a collection:\n
@@ -225,7 +289,7 @@ def get_tweet_dict_by_tweet_id_using_regex(regex,collection):
 
 def get_tweet_by_id(id_str,collection):
     """Returns one doc with this id"""
-    return db[collection].find_one({'_id':id_str})
+    return (db[collection].find_one({'_id':id_str}) or None)
 
 def get_tweets_list_by_id(id_list,collection):
     """Returns one doc with this id"""
@@ -257,42 +321,6 @@ def update_many_tweets_dicts_in_mongo(tweets_list,collection):
 ##########################################################################################
 ##################################### INSERT   ###########################################
 ##########################################################################################
-@deprecated(version='1.0', reason="Deprecated, It was used when a tweet couldn't be in a collection")
-def insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_ids_list,collection):
-    """Inserts multiple tweets in mongo:\n
-        If some doc in already in the collection, will be ignored"""
-    print("[MONGO INSERT MANY INFO] Inserting tweets in mongo Collection = '{}' ".format(collection))
-    #TODO COMPROBAR EN EJECUCIONES POR QUERY QUE NO ESTÁN YA
-    tweets_no_insertados = 0
-    try:
-        repited_tweet_ids = get_tweets_ids_that_are_already_in_the_database(mongo_tweets_ids_list,collection)
-        for repeated_id in repited_tweet_ids:
-            del mongo_tweets_dict[repeated_id]
-            tweets_no_insertados +=1
-
-        tweets_no_repetidos = mongo_tweets_dict.values()
-        if len(tweets_no_repetidos) >0:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            for e in tweets_no_repetidos:
-                e["first_capture"] = now
-                e["last_update"] = now
-            db[(collection or "tweets")].insert_many(tweets_no_repetidos)
-        if tweets_no_insertados > 0:
-            print("[MONGO INSERT MANY WARN] {} messages weren't inserted because they were already in the collection {}".format(tweets_no_insertados,collection))
-    except errors.BulkWriteError as bwe:
-        detalles = bwe.details
-        for error in detalles["writeErrors"]:
-            del error["op"]
-        print("\n\n"+traceback.format_exc())
-        print("[MONGO INSERT MANY ERROR] {}\n\n".format(bwe))
-        print("[MONGO INSERT MANY ERROR] \n {}".format(json.dumps(detalles["writeErrors"],indent=4, sort_keys=True)))
-        exit(1)
-    except Exception as e:
-        print("\n\n"+traceback.format_exc())
-        print("[MONGO INSERT MANY ERROR] {}\n\n".format(e))
-        exit(1)
-    print("[MONGO INSERT MANY INFO] Finish sucessfully ")
-    return tweets_no_repetidos
 
 
 def insertar_multiples_tweets_en_mongo_v2(mongo_tweets_dict,mongo_tweets_ids_list,collection):
@@ -312,11 +340,9 @@ def insertar_multiples_tweets_en_mongo_v2(mongo_tweets_dict,mongo_tweets_ids_lis
 
         tweets_no_repetidos = mongo_tweets_dict.values()
         if len(tweets_no_repetidos) >0:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for e in tweets_no_repetidos:
-                e["first_capture"] = now
-                e["last_update"] = now
-                e["has_likes_info"] = False
+                for k,v in get_additional_tweet_fields().items(): # we add special fields like first capture
+                    e[k] = v
 
             # insertamos los tweets en mongo
             db[(collection or "tweets")].insert_many(tweets_no_repetidos)
@@ -325,7 +351,7 @@ def insertar_multiples_tweets_en_mongo_v2(mongo_tweets_dict,mongo_tweets_ids_lis
             result_cursor = get_tweets_list_by_id(list(nombres_ficheros_temporales),collection)
             for tmp in result_cursor:
                 name_without_tmp = tmp["_id"][:-4]
-                db[collection].update({'_id':name_without_tmp}, {'$set': {"likes_info":tmp["likes_info"],"has_like_info":True}})
+                db[collection].update({'_id':name_without_tmp}, {'$set': {"likes_info":tmp["likes_info"],"has_likes_info":True}})
                 db[collection].remove({'_id':tmp["_id"]})
         if tweets_no_insertados > 0:
             print("[MONGO INSERT MANY WARN] {} messages weren't inserted because they were already in the collection {}".format(tweets_no_insertados,collection))
@@ -616,6 +642,147 @@ def insert_tweet_of_searched_users_not_captured_yet_file(special_doc_dict,collec
     except:
         db[collection].replace_one({"_id" : tweet_of_searched_users_not_captured_yet_file_id },special_doc_dict,upsert=True)
 
+
+def get_user_who_liked_dict_merge(dict_1,dict_2):
+    merged_dict = dict_1.copy()
+    new_likes = 0
+    for k,v in dict_2.items():
+        if k not in dict_1:
+            merged_dict[k] =v 
+            new_likes +=1
+    return merged_dict,new_likes
+
+def insert_or_update_likes_info_in_docs(tweet_likes_info_dict,collection):
+    def concat_tmp(x):
+        return x+"_tmp"
+
+    ids_that_are_in_database = get_tweets_dict_by_id(list(tweet_likes_info_dict.keys()),collection)
+    nombres_ficheros_temporales = list(map(concat_tmp,tweet_likes_info_dict.keys()))
+    tmp_ids_that_are_in_database = get_tweets_dict_by_id(nombres_ficheros_temporales,collection)
+
+    for tweet,likes_info_to_insert in tweet_likes_info_dict.items():
+        aux = likes_info_to_insert.copy()
+        if tweet in ids_that_are_in_database:
+            if ids_that_are_in_database[tweet]["has_likes_info"]:
+                likes_info_from_collection =  ids_that_are_in_database[tweet]["likes_info"]   
+                users_who_liked_aux,new_likes = get_user_who_liked_dict_merge(likes_info_from_collection["users_who_liked"],likes_info_to_insert["users_who_liked"])    
+                aux["users_who_liked"] = users_who_liked_aux
+                aux["veces_recorrido"] = ids_that_are_in_database[tweet]["veces_recorrido"] +1
+            aux["num_likes_capturados"] = len(aux["users_who_liked"])
+            db[collection].update({'_id':tweet}, {'$set': {"likes_info":aux}})
+        else:
+            tweet_id_tmp = tweet+"_tmp"
+            if tweet_id_tmp in tmp_ids_that_are_in_database:
+                likes_info_from_collection =  tmp_ids_that_are_in_database[tweet_id_tmp]["likes_info"] 
+                users_who_liked_aux,new_likes = get_user_who_liked_dict_merge(likes_info_from_collection["users_who_liked"],likes_info_to_insert["users_who_liked"])
+                aux["users_who_liked"] = users_who_liked_aux   
+                aux["num_likes_capturados"] = len(aux["users_who_liked"])
+                aux["veces_recorrido"] = likes_info_from_collection["veces_recorrido"] +1
+                db[collection].update({'_id':tweet_id_tmp}, {'$set': {"likes_info":aux}})   
+            else:
+                try:
+                    db[collection].insert(get_tmp_likes_file_dict(tweet,aux))
+                except Exception as e:
+                    print(e)
+                        
+
+def insert_or_update_one_registry_of_likes_list_file_v2(collection,tweet_id,num_likes,users_who_liked_dict,author_id,author_screen_name,tupla_likes):
+    tweet_dict = get_tweet_by_id(tweet_id,collection)
+    tweet_tmp_dict = get_tweet_by_id(tweet_id+"_tmp",collection)
+    new_likes=0
+    aux = get_likes_info_registry(tweet_id,users_who_liked_dict,num_likes,author_screen_name,author_id)
+
+    if tweet_dict !=None: # if the tweet is already in the collection
+        if tweet_dict.get("has_likes_info",False):
+            users_who_liked_aux,new_likes = get_user_who_liked_dict_merge(tweet_dict["likes_info"]["users_who_liked"],aux["users_who_liked_dict"])    
+            aux["users_who_liked"] = users_who_liked_aux
+            aux["num_likes_capturados"] = len(aux["users_who_liked"])
+            aux["veces_recorrido"] = tweet_dict["likes_info"]["veces_recorrido"] +1
+        db[collection].update({'_id':tweet_id}, {'$set': {"likes_info":aux, "has_likes_info":True}})
+    else:
+        if tweet_tmp_dict != None: # the tmp is not in the collection
+            users_who_liked_aux,new_likes = get_user_who_liked_dict_merge(tweet_tmp_dict["likes_info"]["users_who_liked"],aux["users_who_liked_dict"])
+            aux["users_who_liked"] = users_who_liked_aux
+            aux["num_likes_capturados"] = len(aux["users_who_liked"]) 
+            aux["veces_recorrido"] = tweet_tmp_dict["veces_recorrido"] +1
+            db[collection].update({'_id':tweet_id+"_tmp"}, {'$set': {"likes_info":aux,"has_likes_info":True}})   
+        else:
+            try:
+                db[collection].insert(get_tmp_likes_file_dict(tweet_id,aux))
+            except Exception as e:
+                print(e)
+    return new_likes
+
+        
+def insert_likes_file_list_if_not_exists(collection):
+    if get_likes_list_file(collection) == None:
+        db[collection].insert({"_id":likes_list_file_id})
+
+
+
+def mark_docs_as_analyzed(docs_ids,collection):
+    """Given a list of docs ids, sets its 'analyzed' field as True"""
+    print("[mark_docs_as_analyzed] marking as analyzed {} tweets".format(len(docs_ids)))
+    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":True}}, multi=True)
+
+def mark_docs_as_not_analyzed(collection):
+    """Sets 'analyzed' field as False in all documents of a collections except special docs,\n
+        Removes Statistics Dict"""
+    docs_ids = get_tweet_ids_list_from_database(collection)
+    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":False}}, multi=True)
+    print("[MONGO STATISTICS WARN] Deleting statistics file")
+    db[collection].remove({"_id":statistics_file_id})
+    print("[MONGO STATISTICS WARN] Statistics file has been deleted")
+
+#mark_docs_as_not_analyzed("test2")
+
+
+
+
+
+
+##################################################################################################################
+######################################### DEPRECATED #############################################################
+##################################################################################################################  
+
+
+@deprecated(version='1.0', reason="Deprecated, It was used when a tweet couldn't be in a collection")
+def insertar_multiples_tweets_en_mongo(mongo_tweets_dict,mongo_tweets_ids_list,collection):
+    """Inserts multiple tweets in mongo:\n
+        If some doc in already in the collection, will be ignored"""
+    print("[MONGO INSERT MANY INFO] Inserting tweets in mongo Collection = '{}' ".format(collection))
+    #TODO COMPROBAR EN EJECUCIONES POR QUERY QUE NO ESTÁN YA
+    tweets_no_insertados = 0
+    try:
+        repited_tweet_ids = get_tweets_ids_that_are_already_in_the_database(mongo_tweets_ids_list,collection)
+        for repeated_id in repited_tweet_ids:
+            del mongo_tweets_dict[repeated_id]
+            tweets_no_insertados +=1
+
+        tweets_no_repetidos = mongo_tweets_dict.values()
+        if len(tweets_no_repetidos) >0:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            for e in tweets_no_repetidos:
+                e["first_capture"] = now
+                e["last_update"] = now
+            db[(collection or "tweets")].insert_many(tweets_no_repetidos)
+        if tweets_no_insertados > 0:
+            print("[MONGO INSERT MANY WARN] {} messages weren't inserted because they were already in the collection {}".format(tweets_no_insertados,collection))
+    except errors.BulkWriteError as bwe:
+        detalles = bwe.details
+        for error in detalles["writeErrors"]:
+            del error["op"]
+        print("\n\n"+traceback.format_exc())
+        print("[MONGO INSERT MANY ERROR] {}\n\n".format(bwe))
+        print("[MONGO INSERT MANY ERROR] \n {}".format(json.dumps(detalles["writeErrors"],indent=4, sort_keys=True)))
+        exit(1)
+    except Exception as e:
+        print("\n\n"+traceback.format_exc())
+        print("[MONGO INSERT MANY ERROR] {}\n\n".format(e))
+        exit(1)
+    print("[MONGO INSERT MANY INFO] Finish sucessfully ")
+    return tweets_no_repetidos
+
 @deprecated(version='1.0', reason="Deprecated, It was used in old likes file")
 def insert_or_update_multiple_registries_of_likes_list_file(tweet_likes_info_dict,collection):
     """Deprecated, It was used in old likes file"""
@@ -630,60 +797,9 @@ def insert_or_update_multiple_registries_of_likes_list_file(tweet_likes_info_dic
         aux["num_likes_capturados"] = len(aux["users_who_liked"])
         db[collection].update({'_id':likes_list_file_id}, {'$set': {tweet:aux}})
 
-def insert_or_update_likes_info_in_docs(tweet_likes_info_dict,collection):
-    def concat_tmp(x):
-        return x+"_tmp"
-    ids_that_are_in_database = get_tweets_dict_by_id(list(tweet_likes_info_dict.keys()),collection)
-    #print(ids_that_are_in_database)
-    nombres_ficheros_temporales = list(map(concat_tmp,tweet_likes_info_dict.keys()))
-    tmp_ids_that_are_in_database = get_tweets_dict_by_id(nombres_ficheros_temporales,collection)
-    #print(tmp_ids_that_are_in_database)
-    new_file =True
-    for tweet,tweet_info in tweet_likes_info_dict.items():
-        aux = tweet_info.copy()
-        if tweet in ids_that_are_in_database:
-            if ids_that_are_in_database[tweet]["has_likes_info"]:    
-                aux["users_who_liked"] = ids_that_are_in_database[tweet]["likes_info"]["users_who_liked"] 
-                for k,v in tweet_info["likes_info"]["users_who_liked"].items():
-                    aux["users_who_liked"][k] =v 
-                aux["veces_recorrido"] = ids_that_are_in_database[tweet]["veces_recorrido"] +1
-            aux["num_likes_capturados"] = len(aux["users_who_liked"])
-            db[collection].update({'_id':tweet}, {'$set': {"likes_info":aux}})
-        else:
-            if tweet+"_tmp" in tmp_ids_that_are_in_database:
-                aux = tmp_ids_that_are_in_database[tweet+"_tmp"]["likes_info"].copy()
-                for k,v in tweet_info["users_who_liked"].items():
-                    aux["users_who_liked"][k] =v
-                aux["num_likes_capturados"] = len(aux["users_who_liked"])
-                aux["tweet_id"] = tweet_info["tweet_id"]
-                aux["user_id"] = tweet_info["user_id"]
-                aux["user_screen_name"] = tweet_info["user_screen_name"]
-                aux["last_like_resgistered"] = tweet_info["last_like_resgistered"]
-                aux["num_likes"] = tweet_info["num_likes"]
-                aux["veces_recorrido"] = tweet_info["veces_recorrido"] +1
-                db[collection].update({'_id':tweet+"_tmp"}, {'$set': {"likes_info":aux}})   
-            else:
-                aux = tweet_info.copy()
-                aux["num_likes_capturados"] = len(aux["users_who_liked"])
-                aux["veces_recorrido"] = 1
-                db[collection].insert({'_id':tweet+"_tmp", 
-                "likes_info":aux ,"id_str":tweet+"_tmp", "last_update": "--", "created_at":"--","user":{"screen_name":aux["user_screen_name"]}})   
-                
-
-
-        
-        
-        
-def insert_likes_file_list_if_not_exists(collection):
-    if get_likes_list_file(collection) == None:
-        db[collection].insert({"_id":likes_list_file_id})
-
-
-
-
-
+@deprecated(version='1.0', reason="Deprecated, It was used in old likes file")
 def insert_or_update_one_registry_of_likes_list_file(collection,tweet_id,num_likes,users_who_liked_dict,author_id,author_screen_name,tupla_likes):
-    """Deprecated DO NOT USE DOES A LOT OF WRITES"""
+    """Deprecated DO NOT USE ,DOES A LOT OF WRITES"""
     logs = get_log_dict_for_special_file_id(likes_list_file_id)
 
     special_doc_dict = _get_special_file(collection,likes_list_file_id)
@@ -738,20 +854,6 @@ def insert_or_update_one_registry_of_likes_list_file(collection,tweet_id,num_lik
     return len(aux["users_who_liked"])
 
 
-def mark_docs_as_analyzed(docs_ids,collection):
-    """Given a list of docs ids, sets its 'analyzed' field as True"""
-    print("[mark_docs_as_analyzed] marking as analyzed {} tweets".format(len(docs_ids)))
-    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":True}}, multi=True)
 
-def mark_docs_as_not_analyzed(collection):
-    """Sets 'analyzed' field as False in all documents of a collections except special docs,\n
-        Removes Statistics Dict"""
-    docs_ids = get_tweet_ids_list_from_database(collection)
-    db[collection].update({'_id':{'$in': docs_ids}}, {'$set': {"analyzed":False}}, multi=True)
-    print("[MONGO STATISTICS WARN] Deleting statistics file")
-    db[collection].remove({"_id":statistics_file_id})
-    print("[MONGO STATISTICS WARN] Statistics file has been deleted")
 
-#mark_docs_as_not_analyzed("test2")
-    
 
