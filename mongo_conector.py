@@ -224,7 +224,7 @@ def get_last_n_tweets_of_a_user_in_a_collection(user_id,collection,num_tweets):
 def get_tweets_to_analyze_or_update_stats(collection,limit=0):
     """Returns a list of tweets from the collection that have its 'analyzed' field distinct than True.\n
         This method returns tweets not analyzed and tweets analyzed that has been updated"""
-    lista_tweets = list(db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids }}).limit(limit))
+    lista_tweets = list(db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids , '$not':re.compile("_tmp$")}}).limit(limit))
     print("[TWEETS FOR ANALYZE] {} tweets retrieved".format(len(lista_tweets)))
     return lista_tweets
 
@@ -667,7 +667,7 @@ def insert_or_update_likes_info_in_docs(tweet_likes_info_dict,collection):
                 likes_info_from_collection =  ids_that_are_in_database[tweet]["likes_info"]   
                 users_who_liked_aux,new_likes = get_user_who_liked_dict_merge(likes_info_from_collection["users_who_liked"],likes_info_to_insert["users_who_liked"])    
                 aux["users_who_liked"] = users_who_liked_aux
-                aux["veces_recorrido"] = ids_that_are_in_database[tweet]["veces_recorrido"] +1
+                aux["veces_recorrido"] = likes_info_from_collection.get("veces_recorrido",8) +1
             aux["num_likes_capturados"] = len(aux["users_who_liked"])
             db[collection].update({'_id':tweet}, {'$set': {"likes_info":aux}})
         else:
@@ -716,7 +716,7 @@ def insert_or_update_one_registry_of_likes_list_file_v2(collection,tweet_id,num_
         
 def insert_likes_file_list_if_not_exists(collection):
     if get_likes_list_file(collection) == None:
-        db[collection].insert({"_id":likes_list_file_id})
+        db[collection].insert({"_id":likes_list_file_id,"info":"likes file is deprecated, now each tweet stores its own likes info"})
 
 
 

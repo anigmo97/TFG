@@ -475,7 +475,7 @@ def get_likes_values(partido):
 
 def execute_likes_option_with_queues():
     cond = True
-    now = get_string_datetime_now()
+    now =  datetime.datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
     log_file_name = "likes_process_{}.txt".format(now)
     mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
     driver = twitter_web_consumer.open_twitter_and_login()
@@ -573,7 +573,7 @@ def execute_likes_option_with_threads():
     cond = True
     mongo_conector.insert_likes_file_list_if_not_exists(mongo_conector.current_collection)
     now = get_string_datetime_now()
-    log_file_name = "likes_process_{}".format(now)
+    log_file_name = "likes_process_{}".format(datetime.datetime.now().strftime("%Y-%m-%d__%H-%M-%S"))
     message_timer= Timer(15*60,show_likes_info,[log_file_name])
     message_timer.start()
     mongo_conector.delete_tweet_of_searched_users_not_captured_yet_file(mongo_conector.current_collection) 
@@ -786,10 +786,12 @@ if __name__ == "__main__":
                     build_embed_top_tweets_dict()
                     mongo_conector.insert_statistics_file_in_collection(global_variables.get_statistics_dict(),mongo_conector.current_collection)
                     lista_tweets = mongo_conector.get_tweets_to_analyze_or_update_stats(mongo_conector.current_collection,trunk)
+                    # print(global_variables.get_statistics_dict())
+                    # input()
                 cond = args.loop
                 if cond:
                     sleep(600)
-                
+            print(global_variables.get_statistics_dict())
             
 
         elif checkParameter(args.collection_query): # -cq option
