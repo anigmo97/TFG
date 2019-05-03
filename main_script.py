@@ -784,9 +784,10 @@ if __name__ == "__main__":
         elif checkParameter(args.analyze): # -a option
             if checkParameter(args.forced):
                 mongo_conector.mark_docs_as_not_analyzed(mongo_conector.current_collection)
-            statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
-            if statistics_file != None:
-                global_variables.set_statistics_from_statistics_dict(statistics_file)
+            else:
+                statistics_file = mongo_conector.get_statistics_file_from_collection(mongo_conector.current_collection)
+                if statistics_file != None:
+                    global_variables.set_statistics_from_statistics_dict(statistics_file)
             trunk = args.analysis_trunk or 500
             
             cond = True

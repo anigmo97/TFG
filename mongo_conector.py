@@ -448,6 +448,10 @@ def delete_tweet_of_searched_users_not_captured_yet_file(collection):
         (is used in likes process with queues)"""
     db[collection].remove({"_id":tweet_of_searched_users_not_captured_yet_file_id})
 
+def delete_statistics_file(collection):
+    """Deletes statistics file"""
+    db[collection].remove({"_id":statistics_file_id})
+
 ########################################################## INSERTS #########################################################
 
 def insert_statistics_file_in_collection(statistics_dict,collection):
@@ -457,9 +461,11 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
     way_of_send_with_keys_without_dots =  change_dot_in_keys_for_bullet(statistics_dict["way_of_send_counter"])
     statistics_dict["way_of_send_counter"] = way_of_send_with_keys_without_dots
 
-    print("[MONGO INSERT STATISTICS FILE INFO] Inserting new statistics file in collection {}".format(collection))
+    if get_statistics_file_from_collection(collection)!= None:
+        print(len(get_statistics_file_from_collection(collection)))
+    input("insercion")
     if get_statistics_file_from_collection(collection) == None:
-        print("[MONGO INSERT STATISTICS FILE INFO] Inserting new statistics file")
+        print("[MONGO INSERT STATISTICS FILE INFO] Inserting new statistics file in collection {}".format(collection))
         db[collection].insert(statistics_dict)
         print("[MONGO INSERT STATISTICS FILE INFO] The statistics file has been save sucessfully")
     else:
@@ -873,3 +879,4 @@ def insert_or_update_one_registry_of_likes_list_file(collection,tweet_id,num_lik
 
 
 
+insert_statistics_file_in_collection({"jajaj":1,"way_of_send_counter":{}},"cambio_proceso")
