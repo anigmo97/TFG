@@ -734,6 +734,23 @@ def mark_docs_as_not_analyzed(collection):
     db[collection].remove({"_id":statistics_file_id})
     print("[MONGO STATISTICS WARN] Statistics file has been deleted")
 
+def mark_likes_as_not_counted(collection):
+    """ Sets 'likes_info.likes_count_update' to false and puts all likes count to False and removes users_file"""
+    db[collection].update({"likes_info" : {"$exists" : True}, '_id': {'$nin': special_doc_ids }},
+        {'$set': {"has_likes_info":True,"likes_info.likes_count_updated":False}},multi=True)
+
+    mongo_cursor = db[collection].find({"has_likes_info":True, '_id': {'$nin': special_doc_ids }},{"_id": 1, "likes_info.users_who_liked":1})
+    for e in mongo_cursor:
+        doc_id = e["_id"]
+        users_who_liked = e["likes_info.users_who_liked"].copy()
+        for i in users_who_liked:
+             users_who_liked[i]["counted"] = False
+        db[collection].update({"_id":doc_id},{"$set":{"likes_info.users_who_liked":users_who_liked}},multi=True)
+
+    db[collection].remove({"_id":users_file_id})
+
+    
+
 #mark_docs_as_not_analyzed("test2")
 
 
@@ -852,7 +869,6 @@ def insert_or_update_one_registry_of_likes_list_file(collection,tweet_id,num_lik
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
     
     return len(aux["users_who_liked"])
-
 
 
 

@@ -473,7 +473,7 @@ def get_likes_values(partido):
         return (0,0,0,0,0,0)
     return val
 
-def execute_likes_option_with_queues():
+def execute_likes_option_with_queues(likes_parser):
     cond = True
     now =  datetime.datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
     log_file_name = "likes_process_{}.txt".format(now)
@@ -500,7 +500,10 @@ def execute_likes_option_with_queues():
                             global_likes_queue[user] = add_new_tweets_of_this_user_to_queue(global_likes_queue[user],user_id,user,args.initial_messages)
                             tweet_queue_aux=[]
                             for tweet_id in global_likes_queue[user]["tweet_queue"]:
-                                num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
+                                if likes_parser == "html_parser":
+                                    num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet_without_navegator(user,tweet_id)
+                                else:
+                                    num_likes,users_who_liked = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,tweet_id,driver)
  
                                 likes_captured_for_this_tweet = mongo_conector.insert_or_update_one_registry_of_likes_list_file_v2(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
                                 
@@ -537,7 +540,7 @@ def capture_likes_clicking_on_timeline(users_list,searched_users_file,last_n):
             likes_captured_for_this_tweet = mongo_conector.insert_or_update_one_registry_of_likes_list_file_v2(mongo_conector.current_collection,tweet_id,num_likes,users_who_liked,user_id,user,tupla_likes)
     driver.close()
 
-def capture_likes_loading_each_tweet_page(users_list,searched_users_file,last_n,log_file_name):
+def capture_likes_loading_each_tweet_page(likes_parser,users_list,searched_users_file,last_n,log_file_name):
     
     cond = True
     while cond:
@@ -550,8 +553,11 @@ def capture_likes_loading_each_tweet_page(users_list,searched_users_file,last_n,
             tupla_likes = get_likes_values(partido)
             user_id = mongo_conector.get_searched_user_id_with_screenname(user)
             for id_mensaje in tweets_list+retweets_list:
-                #num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,id_mensaje,driver)
-                num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet_without_navegator(user,id_mensaje)
+                if likes_parser == "html_parser":
+                    num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet_without_navegator(user,id_mensaje)
+                else:
+                    num_likes,users_who_liked_dict = twitter_web_consumer.get_last_users_who_liked_a_tweet(user,id_mensaje,driver)
+                
                 likes_list_file_aux[id_mensaje] = mongo_conector.get_likes_info_registry(id_mensaje,users_who_liked_dict,num_likes,user,user_id)
         log_str = "[THREAD INFO] LOOP COMPLETED IN {}".format(datetime.datetime.now()-initial_time)
         print(log_str)
@@ -569,7 +575,7 @@ def show_likes_info(logfile,with_timer=True):
         Timer(15*60,show_likes_info,[logfile]).start()
     print(log_str) 
 
-def execute_likes_option_with_threads():
+def execute_likes_option_with_threads(likes_parser):
     cond = True
     mongo_conector.insert_likes_file_list_if_not_exists(mongo_conector.current_collection)
     now = get_string_datetime_now()
@@ -591,7 +597,7 @@ def execute_likes_option_with_threads():
             for users_list in users_repartition:
                 # capture_likes_loading_each_tweet_page(users_list,searched_users_file,args.initial_messages)
                 if len(users_list)>0:
-                    threads_list.append(Thread(target=capture_likes_loading_each_tweet_page, args=(users_list,searched_users_file,args.initial_messages,log_file_name,)))
+                    threads_list.append(Thread(target=capture_likes_loading_each_tweet_page, args=(likes_parser,users_list,searched_users_file,args.initial_messages,log_file_name,)))
                     threads_list[-1].start()
             for thread in threads_list:
                 thread.join()
@@ -609,7 +615,7 @@ def do_likes_count_actions(collection):
             likes_info = e.get("likes_info",False)
             tweet_id = e.get("_id")
             user = e["user"]["screen_name"]
-            partido = searched_users_file[user]["partido"]
+            partido = searched_users_file[user.lower()]["partido"]
             likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS = get_likes_values(partido)
             if likes_info:
                 users_who_liked = likes_info.get("users_who_liked",False)
@@ -665,7 +671,10 @@ if __name__ == "__main__":
     parser.add_argument("-lr","--likes_ratio",help="Sets a number of likes to get for a tweets in 30 min to keep capturing likes",type=int)
     parser.add_argument("-im","--initial_messages",help="Sets in how many tweets capture likes ( last n tweets)",type=int)
     parser.add_argument("--forced",help="Analyze the collection removing the satistics file at the beginning",action="store_true")
-    parser.add_argument("--web",help="get likes from tweets using web", action="store_true")
+    parser.add_argument("-likes_method",help="Sets the way of get tweets for check likes in likes option last-n ( with threads) or relevance (with queue)",
+    type=str,choices=["LAST_N","last_n","relevance","RELEVANCE"])
+    parser.add_argument("-likes_parser",help="Sets the way of get likes web (slow but gets last 25 users who liked) html:parser (fast) get las 9 interactions (could be retweets)", 
+    type=str,choices=["WEB","web","HTML_PARSER","html_parser","HTML_parser"])
 
     parser.add_argument("-c","-C","--collection",help="MongoDB collection to use",type=str)
     parser.add_argument("-cq", "-CQ","--collection_query",help="Execute querys registered in the query file of a collection",type=str)
@@ -715,8 +724,11 @@ if __name__ == "__main__":
                 throw_error(sys.modules[__name__],"Con la opción -a solo se pueden utilizar las opciones: -c -t -l --forced ")
 
         elif checkParameter(args.likes): # --likes option
-            if checkOptions(args.likes,args.initial_messages,args.loop,args.likes_ratio,args.collection,args.web)< options_passed:
-                throw_error(sys.modules[__name__],"Con la opción --likes solo se pueden utilizar las opciones: -im -l -lr -c")
+            if checkOptions(args.likes,args.initial_messages,args.loop,args.likes_ratio,args.collection,args.web,args.likes_method,args.likes_parser)< options_passed:
+                throw_error(sys.modules[__name__],"Con la opción --likes solo se pueden utilizar las opciones: -im -l -lr -c -likes_parser -likes_method")
+            elif checkOptions(args.likes_method,args.likes_parser) < 2:
+                throw_error(sys.modules[__name__],"Con la opción --likes se deben utilizar las opciones: -likes_parser -likes_method")
+
 
         elif checkParameter(args.likes_count): # --likes_count option
             if checkOptions(args.likes_count,args.collection)< options_passed:
@@ -733,8 +745,8 @@ if __name__ == "__main__":
                 throw_error(sys.modules[__name__],"Con la opción -cu solo se pueden utilizar las opciones: -l -mm")
 
         else: # -s option 
-            if checkOptions(args.streamming,args.words,args.max_time,args.max_messges,args.loop) < options_passed:
-                throw_error(sys.modules[__name__],"Con la opcion -s solo se pueden utilizar las opciones: -w -mt -mm -c")
+            if checkOptions(args.streamming,args.words,args.max_time,args.max_messages,args.loop,args.collection) < options_passed:
+                throw_error(sys.modules[__name__],"Con la opcion -s solo se pueden utilizar las opciones: -w -mt -mm -c -l")
     else:
         if checkOptions(args.collection,args.update):
             throw_error(sys.modules[__name__],"En el modo por defecto ( no se usan las optiones principales) solo se pueden utilizar las opciones: -up -c")
@@ -791,7 +803,7 @@ if __name__ == "__main__":
                 cond = args.loop
                 if cond:
                     sleep(600)
-            print(global_variables.get_statistics_dict())
+            #print(global_variables.get_statistics_dict())
             
 
         elif checkParameter(args.collection_query): # -cq option
@@ -825,11 +837,13 @@ if __name__ == "__main__":
                 cond = args.loop
 
         elif checkParameter(args.likes): # --likes option
-            if args.web:
-                execute_likes_option_with_queues()
+            if args.likes_method.lower == "relevance":
+                execute_likes_option_with_queues(args.likes_parser.lower())
             else:
-                execute_likes_option_with_threads()
+                execute_likes_option_with_threads(args.likes_parser.lower())
         elif checkParameter(args.likes_count): # --likes-count
+            if (checkParameter(args.forced)):
+                mongo_conector.mark_likes_as_not_counted(mongo_conector.current_collection)
             do_likes_count_actions(mongo_conector.current_collection)
 
         # There is no options in [ -f, -d, -dd, -q, -qf,-cq, -s, --likes, --likes_count]

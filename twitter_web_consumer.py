@@ -148,7 +148,8 @@ def get_last_users_who_liked_a_tweet(screen_name, tweet_id,driver):
 	return look_into_likes_list(driver)
 
 def get_last_users_who_liked_a_tweet_without_navegator(screen_name, tweet_id):
-	html = urllib.request.urlopen('https://twitter.com/'+screen_name+'/status/'+tweet_id)
+	url = 'https://twitter.com/'+screen_name+'/status/'+tweet_id
+	html = urllib.request.urlopen(url)
 	soup = BeautifulSoup(html.read(),'html.parser')
 	try:
 		likes_section = soup.select_one(".avatar-row.js-face-pile-container")
@@ -161,10 +162,15 @@ def get_last_users_who_liked_a_tweet_without_navegator(screen_name, tweet_id):
 			aux["user_name"] = e["original-title"]
 			aux["counted"] = False
 			result_dict[e["data-user-id"]]=aux
-		print("{} likes capturados de {}".format(len(likes_section.select("a")),num_likes))
+		
+		num_likes_capturados = len(likes_section.select("a"))
+		if num_likes_capturados > int(num_likes):
+			print("{} likes capturados de {} {}".format(num_likes_capturados,num_likes,url))
+		else:
+		 	print("{} likes capturados de {}".format(num_likes_capturados,num_likes))
 		return num_likes,result_dict
 	except:
-		print("Error scraping webpage without navegator {}".format('https://twitter.com/'+screen_name+'/status/'+tweet_id))
+		print("Error scraping webpage without navegator {}".format(url))
 		return 0,{}
 	
 	

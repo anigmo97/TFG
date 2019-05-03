@@ -2,7 +2,7 @@
 
 LIKES_PER_30_MIN_RATIO=30
 INITIAL_TWEETS=20
-COLECCION="test3"
+COLECCION="new"
 
 
 POLITICOS_PP="@populares @ppcv @pablocasado_ @TeoGarciaEgea @Rafa_Hernando @DolorsMM @Ignacos @Albiol_XG @ALevySoler @IdiazAyuso"
@@ -21,5 +21,5 @@ python3 main_script.py -c $COLECCION -qu $POLITICOS_COMPROMIS -p COMPROMIS -mm $
 
 
 python3 main_script.py -a -c $COLECCION
-python3 main_script.py -c $COLECCION --likes -im $INITIAL_TWEETS -lr $LIKES_PER_30_MIN_RATIO
+#python3 main_script.py -c $COLECCION --likes -im $INITIAL_TWEETS -lr $LIKES_PER_30_MIN_RATIO
 #python3 main_script.py -cu $COLECCION 
