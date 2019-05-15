@@ -622,9 +622,9 @@ def do_likes_count_actions(collection):
                 if users_who_liked:
                     aux = users_who_liked.copy()
                     for k,v in users_who_liked.items():
-                        # check count
+                        # check count 
                         if not v["counted"]: 
-                            mongo_conector.insert_or_update_users_file(collection,v["user_id"],v["user_screen_name"],likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,
+                            mongo_conector.insert_or_update_likes_count_files(collection,v["user_id"],v["user_screen_name"],likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,
                                 likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id)
                             auxiliar = v 
                             auxiliar["counted"] = True
@@ -724,14 +724,14 @@ if __name__ == "__main__":
                 throw_error(sys.modules[__name__],"Con la opción -a solo se pueden utilizar las opciones: -c -t -l --forced ")
 
         elif checkParameter(args.likes): # --likes option
-            if checkOptions(args.likes,args.initial_messages,args.loop,args.likes_ratio,args.collection,args.web,args.likes_method,args.likes_parser)< options_passed:
+            if checkOptions(args.likes,args.initial_messages,args.loop,args.likes_ratio,args.collection,args.likes_method,args.likes_parser)< options_passed:
                 throw_error(sys.modules[__name__],"Con la opción --likes solo se pueden utilizar las opciones: -im -l -lr -c -likes_parser -likes_method")
             elif checkOptions(args.likes_method,args.likes_parser) < 2:
                 throw_error(sys.modules[__name__],"Con la opción --likes se deben utilizar las opciones: -likes_parser -likes_method")
 
 
         elif checkParameter(args.likes_count): # --likes_count option
-            if checkOptions(args.likes_count,args.collection)< options_passed:
+            if checkOptions(args.likes_count,args.forced,args.collection)< options_passed:
                 throw_error(sys.modules[__name__],"Con la opción --likes_count solo se pueden utilizar la opcion: -c")
             elif checkOptions(args.likes_count,args.collection)< 2:      
                 throw_error(sys.modules[__name__],"Con la opción --likes_count se debe utilizar la opcion: -c")  

@@ -165,9 +165,9 @@ def get_last_users_who_liked_a_tweet_without_navegator(screen_name, tweet_id):
 		
 		num_likes_capturados = len(likes_section.select("a"))
 		if num_likes_capturados > int(num_likes):
-			print("{} likes capturados de {} {}".format(num_likes_capturados,num_likes,url))
+			print("{} intercciones (likes y retweets) capturadas de {} likes {}".format(num_likes_capturados,num_likes,url))
 		else:
-		 	print("{} likes capturados de {}".format(num_likes_capturados,num_likes))
+		 	print("{} intercciones (likes y retweets) capturadas de {} likes".format(num_likes_capturados,num_likes))
 		return num_likes,result_dict
 	except:
 		print("Error scraping webpage without navegator {}".format(url))

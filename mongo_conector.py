@@ -1,5 +1,6 @@
 # encoding: utf-8
 from pymongo import MongoClient,errors,ASCENDING,DESCENDING
+from pymongo.collation import Collation
 from bson.objectid import ObjectId
 # from global_functions import change_dot_in_keys_for_bullet,change_bullet_in_keys_for_dot
 import traceback
@@ -22,11 +23,11 @@ statistics_file_id = "statistics_file_id"
 query_file_id = "query_file_id"
 streamming_file_id = "streamming_file_id"
 searched_users_file_id = "searched_users_file_id"
-likes_list_file_id = "likes_list_file_id"
-users_file_id = "users_file_id"
+likes_list_file_id = "likes_list_file_id" #deprecated
+likes_count_file_id = "likes_count_file" #multiple files (particioned)
 tweet_of_searched_users_not_captured_yet_file_id = "tweet_of_searched_users_not_captured_yet_file_id" # it's created in likes process in loop
 
-special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,users_file_id,tweet_of_searched_users_not_captured_yet_file_id]
+special_doc_ids = [statistics_file_id,query_file_id,streamming_file_id,searched_users_file_id,likes_list_file_id,likes_count_file_id,tweet_of_searched_users_not_captured_yet_file_id]
 
 
 ########################### FIELDS ADDED TO TWEETS #######################################
@@ -122,7 +123,8 @@ def get_count_of_a_collection(collection):
     return db[collection].count()
 
 def get_likes_count_of_a_collection(collection):
-    mongo_cursor = db[collection].find({'_id':{"$nin":special_doc_ids}})
+    #TODO change
+    mongo_cursor = db[collection].find({'_id':{"$regex":"^(?!likes_count_file)","$nin":special_doc_ids}})
     counter = 0
     for doc in mongo_cursor:
         likes_info = doc.get("likes_info",False)
@@ -135,13 +137,13 @@ def get_tweet_ids_list_from_database(collection):
     """returns a list with docs_ids (tweets_ids)\n
         Exclude special docs ids"""
     cursor_resultados = db[(collection or "tweets")].find({},{ "id_str": 1, "_id": 1 } )
-    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["_id"] not in special_doc_ids ]
+    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["_id"] not in special_doc_ids and not x["_id"].startswith("likes_count_file_id") ]
     return tweets_id_list
 
 def get_tweet_ids_list_of_a_user_from_collection(user_id,collection):
     """Returns a list with docs_ids (tweets_ids) from a user given user_id and collection"""
     cursor_resultados = db[(collection or "tweets")].find({"user.id_str" : user_id},{ "id_str": 1, "_id": 1 } )
-    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["_id"] not in special_doc_ids ]
+    tweets_id_list = [x["id_str"] for x in cursor_resultados if x["_id"] not in special_doc_ids and not x["_id"].startswith("likes_count_file_id")]
     return tweets_id_list
 
 def get_searched_user_id_with_screenname(user_screen_name):
@@ -172,7 +174,8 @@ def get_users_of_a_political_party(political_party,collection):
 def get_tweets_cursor_from_mongo(collection):
     """Returns a cursor of all documents from a collection except special docs"""
     print("[MONGO GET CURSOR INFO] Coleccion = {}".format(collection))
-    return db[(collection or "tweets")].find({'_id': {'$nin': special_doc_ids }})
+    #TODO change
+    return db[(collection or "tweets")].find({'_id':{"$regex":"^(?!likes_count_file)","$nin":special_doc_ids}})
 
 def get_tweets_ids_that_are_already_in_the_database(tweet_ids_list,collection):
     """Given a docs_ids (tweets_ids) list and a collection returns a list with\n
@@ -224,13 +227,15 @@ def get_last_n_tweets_of_a_user_in_a_collection(user_id,collection,num_tweets):
 def get_tweets_to_analyze_or_update_stats(collection,limit=0):
     """Returns a list of tweets from the collection that have its 'analyzed' field distinct than True.\n
         This method returns tweets not analyzed and tweets analyzed that has been updated"""
-    lista_tweets = list(db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids , '$not':re.compile("_tmp$")}}).limit(limit))
+    #TODO change
+    lista_tweets = list(db[collection].find({"analyzed" :{"$ne": True}, '_id': {'$nin': special_doc_ids , "$regex":"^(?!likes_count_file)",'$not':re.compile("_tmp$")}}).limit(limit))
     print("[TWEETS FOR ANALYZE] {} tweets retrieved".format(len(lista_tweets)))
     return lista_tweets
 
 def get_tweets_to_count_likes(collection,limit=0):
     """Returns a list of tweets from the collection that have its 'likes_info.likes_count_updated' field set to False"""
-    lista_tweets = list(db[collection].find({"has_likes_info" : True,"likes_info.likes_count_updated":False ,'_id': {'$nin': special_doc_ids }}).limit(limit))
+    #TODO change
+    lista_tweets = list(db[collection].find({"has_likes_info" : True,"likes_info.likes_count_updated":False ,'_id': {'$nin': special_doc_ids,"$regex":"^(?!likes_count_file)"}}).limit(limit))
     print("[TWEETS FOR COUNT LIKES] {} tweets retrieved".format(len(lista_tweets)))
     return lista_tweets
 
@@ -277,12 +282,14 @@ def get_users_screen_name_dict_of_tweet_ids_for_tops_in_statistics_file(statisti
     return  get_users_screen_name_dict_of_tweet_ids(tweet_id_list,collection)
 
 def get_tweet_list_by_tweet_id_using_regex(regex,collection):
+    #TODO change
     """Given a regex and a collection, returns a list of tweets who id satisficies the regex"""
-    return [ x for x in db[collection].find({'-id':{'$regex':regex, '$nin': special_doc_ids}})]
+    return [ x for x in db[collection].find({'_id':{'$regex':regex, '$nin': special_doc_ids, "$regex":"^(?!likes_count_file)"}})]
 
 def get_tweet_dict_by_tweet_id_using_regex(regex,collection):
+    #TODO change
     """Given a regex and a collection, returns a dict of tweets who id satisficies the regex"""
-    return  { x['_id'] : x for x in db[collection].find({'_id':{'$regex':regex, '$nin': special_doc_ids}})}
+    return  { x['_id'] : x for x in db[collection].find({'_id':{'$regex':regex, '$nin': special_doc_ids, "$regex":"^(?!likes_count_file)"}})}
     #return  { x['_id'] : x for x in db[collection].find({'_id':{'$regex':regex, '$nin': special_doc_ids}}) if x["_id"][:-4]!= "_tmp"}
 
 
@@ -384,12 +391,14 @@ def do_additional_actions_for_statistics_file(statistics_dict,collection):
 
 def get_log_dict_for_special_file_id(file_id):
     """Returns a dict with logs for special docs"""
+    if file_id.startswith("likes_count_file_id"):
+        file_id = "likes_count_file_id"
     aux = {
         statistics_file_id : { "upper_name" : "STATISTICS_FILE", "file_aux" :"Fichero de estadisticas" , "file_id" : statistics_file_id },
         query_file_id : { "upper_name" : "QUERY_FILE", "file_aux" :"Fichero de querys" , "file_id" : query_file_id },
         streamming_file_id : { "upper_name" : "STREAMMING_FILE", "file_aux" :"Fichero de busquedas por streamming" , "file_id" : streamming_file_id },
         searched_users_file_id : { "upper_name" : "SEARCHED_USERS_FILE", "file_aux" :"Fichero de usuarios buscados" , "file_id" : searched_users_file_id },
-        users_file_id : { "upper_name" : "USERS_FILE", "file_aux" :"Fichero de usuarios" , "file_id" : users_file_id },
+        likes_count_file_id : { "upper_name" : "LIKES_COUNT_FILE", "file_aux" :"Fichero de conteo de likes" , "file_id" : likes_count_file_id },
         likes_list_file_id : { "upper_name" : "LIKES_FILE", "file_aux" :"Fichero de likes" , "file_id" : likes_list_file_id },
         tweet_of_searched_users_not_captured_yet_file_id : { "upper_name" : "TWEETS_IDS_OF_SEARCHED_USER_NOT_CAPTURED_YET_FILE", "file_aux" :"Fichero de tweets id de usuarios buscados no capturados todavía" , "file_id" : tweet_of_searched_users_not_captured_yet_file_id }
         
@@ -434,9 +443,10 @@ def get_likes_list_file(collection):
     """Returns likes file of a collection"""
     return _get_special_file(collection,likes_list_file_id)
 
-def get_users_file(collection):
-    """Returns users file of a collection"""
-    return _get_special_file(collection,users_file_id)
+def get_likes_count_files(collection):
+    """Returns likes count files of  collection"""
+    cursor_resultados = db[(collection)].find({"_id": {"$regex":"^(likes_count_file)"}}).sort("_id",ASCENDING).collation(Collation(locale="es",numericOrdering=True))
+    return [ x for x in cursor_resultados]
 
 def get_tweet_of_searched_users_not_captured_yet_file(collection):
     """Returns a special file that contains tweets_ids of tweets of searched users not captured yet of acollection\n
@@ -463,7 +473,7 @@ def insert_statistics_file_in_collection(statistics_dict,collection):
 
     if get_statistics_file_from_collection(collection)!= None:
         print(len(get_statistics_file_from_collection(collection)))
-    input("insercion")
+    #input("insercion")
     if get_statistics_file_from_collection(collection) == None:
         print("[MONGO INSERT STATISTICS FILE INFO] Inserting new statistics file in collection {}".format(collection))
         db[collection].insert(statistics_dict)
@@ -501,7 +511,7 @@ def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max
             query=None,words=None,words_comprobation=None,user=None,user_id=None,partido=None):
     """Inserts an special file with common form (query_file, searched_user_files and streamming_file) in a collection """
     print("[INSERT OR UPDATE SPECIAL FILE INFO]")
-    if file_id not in special_doc_ids:
+    if file_id not in special_doc_ids  and not file_id.startswith("likes_count_file_id"):
         raise Exception("El id {} no está entre los ids especiales".format(file_id))
         # tal vez solo use 3 ids
 
@@ -588,19 +598,32 @@ def insert_or_update_searched_users_file(collection, user,user_id,captured_tweet
      file_id=searched_users_file_id,user=user,user_id=user_id,partido=partido)
 
 
-def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id):
+def insert_or_update_likes_count_files(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id):
     """Inserts users file in a collection"""
-    logs = get_log_dict_for_special_file_id(users_file_id)
+    logs = get_log_dict_for_special_file_id(likes_count_file_id)
 
-    special_doc_dict = _get_special_file(collection,users_file_id)
+    likes_count_files = get_likes_count_files(collection)
+    print("LEN ={}".format(len(likes_count_files)))
+    for e in likes_count_files:
+        print("ID {} LENGTH {}".format(e["_id"],len(e)))
+    special_doc_dict = None
 
+    for e in likes_count_files:
+        if user_id in e:
+            special_doc_dict=e
+    nuevo_fichero = False
+    #TODO comprobar en que fichero añadirlo
     if special_doc_dict != None:
         print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
-        nuevo_fichero = False
     else:
         print("[INSERT OR UPDATE {0} INFO] There is NO {0} in collection {1}".format(logs["upper_name"],collection))
-        nuevo_fichero =True
-        special_doc_dict = {"_id" : users_file_id}
+        if len(likes_count_files)>0 and len(likes_count_files[-1])< 6: #TODO put 50001
+            special_doc_dict = likes_count_files[-1]
+        else:
+            special_doc_dict = { "_id" : "likes_count_file_id_" + str(len(likes_count_files))}
+            nuevo_fichero =True
+    input()
+        
 
     if user_id not in special_doc_dict:
         print("[INSERT OR UPDATE {0} INFO] Query is not in {0} (collection {1}), adding new entry ...".format(logs["upper_name"],collection))
@@ -636,7 +659,7 @@ def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP
         print("[MONGO INSERT {0} INFO] The {0} has been save sucessfully".format(logs["upper_name"]))
     else:
         print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
-        db[collection].replace_one({"_id" : users_file_id },special_doc_dict)
+        db[collection].replace_one({"_id" : special_doc_dict["_id"] },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
     
 
@@ -671,7 +694,7 @@ def insert_or_update_likes_info_in_docs(tweet_likes_info_dict,collection):
         if tweet in ids_that_are_in_database:
             if ids_that_are_in_database[tweet]["has_likes_info"]:
                 likes_info_from_collection =  ids_that_are_in_database[tweet]["likes_info"]   
-                users_who_liked_aux,new_likes = get_user_who_liked_dict_merge(likes_info_from_collection["users_who_liked"],likes_info_to_insert["users_who_liked"])    
+                users_who_liked_aux, new_likes = get_user_who_liked_dict_merge(likes_info_from_collection["users_who_liked"],likes_info_to_insert["users_who_liked"])    
                 aux["users_who_liked"] = users_who_liked_aux
                 aux["veces_recorrido"] = likes_info_from_collection.get("veces_recorrido",8) +1
             aux["num_likes_capturados"] = len(aux["users_who_liked"])
@@ -742,18 +765,20 @@ def mark_docs_as_not_analyzed(collection):
 
 def mark_likes_as_not_counted(collection):
     """ Sets 'likes_info.likes_count_update' to false and puts all likes count to False and removes users_file"""
-    db[collection].update({"likes_info" : {"$exists" : True}, '_id': {'$nin': special_doc_ids }},
+    #TODO: change
+    db[collection].update({"likes_info" : {"$exists" : True}, '_id': {'$nin': special_doc_ids ,"$regex":"^(?!likes_count_file)"}},
         {'$set': {"has_likes_info":True,"likes_info.likes_count_updated":False}},multi=True)
-
-    mongo_cursor = db[collection].find({"has_likes_info":True, '_id': {'$nin': special_doc_ids }},{"_id": 1, "likes_info.users_who_liked":1})
+    #TODO: change
+    mongo_cursor = db[collection].find({"has_likes_info":True, '_id': {'$nin': special_doc_ids,"$regex":"^(?!likes_count_file)" }},{"_id": 1, "likes_info.users_who_liked":1})
     for e in mongo_cursor:
         doc_id = e["_id"]
-        users_who_liked = e["likes_info.users_who_liked"].copy()
+        print(e)
+        users_who_liked = e["likes_info"]["users_who_liked"].copy()
         for i in users_who_liked:
              users_who_liked[i]["counted"] = False
         db[collection].update({"_id":doc_id},{"$set":{"likes_info.users_who_liked":users_who_liked}},multi=True)
 
-    db[collection].remove({"_id":users_file_id})
+    db[collection].remove({"_id":{"$regex":"^likes_count_file_id"}})
 
     
 
@@ -876,7 +901,60 @@ def insert_or_update_one_registry_of_likes_list_file(collection,tweet_id,num_lik
     
     return len(aux["users_who_liked"])
 
+@deprecated(version='1.0', reason="Deprecated, It was used when likes cout were stored in only one file")
+def get_users_file(collection):
+    """Returns users file of a collection"""
+    return _get_special_file(collection,likes_count_file_id)
+
+@deprecated(version='1.0', reason="Deprecated, It was used when likes cout were stored in only one file")
+def insert_or_update_users_file(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id):
+    """Inserts users file in a collection"""
+    logs = get_log_dict_for_special_file_id(likes_count_file_id)
+
+    special_doc_dict = _get_special_file(collection,likes_count_file_id)
+
+    if special_doc_dict != None:
+        print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
+        nuevo_fichero = False
+    else:
+        print("[INSERT OR UPDATE {0} INFO] There is NO {0} in collection {1}".format(logs["upper_name"],collection))
+        nuevo_fichero =True
+        special_doc_dict = {"_id" : likes_count_file_id}
+
+    if user_id not in special_doc_dict:
+        print("[INSERT OR UPDATE {0} INFO] Query is not in {0} (collection {1}), adding new entry ...".format(logs["upper_name"],collection))
+        aux = {}
+        aux["user_id"] = user_id
+        aux["user_screen_name"] = user_screen_name
+        aux["likes_to_PP"] = (likes_to_PP or 0)
+        aux["likes_to_PSOE"] = (likes_to_PSOE or 0)
+        aux["likes_to_PODEMOS"] = (likes_to_PODEMOS or 0)
+        aux["likes_to_CIUDADANOS"] = (likes_to_CIUDADANOS or 0)
+        aux["likes_to_VOX"] = (likes_to_VOX or 0)
+        aux["likes_to_COMPROMIS"] = (likes_to_COMPROMIS or 0)
+        aux["last_like_registered"] = str(datetime.now())
+        aux["tweet_ids_liked_list"] =[tweet_id]
+        special_doc_dict[user_id]= aux
+    else:
+        print("[INSERT OR UPDATE {0} INFO] Query is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
+        aux = special_doc_dict[user_id]
+        aux["likes_to_PP"] = aux["likes_to_PP"] + (likes_to_PP or 0)
+        aux["likes_to_PSOE"] = aux["likes_to_PSOE"] + (likes_to_PSOE or 0)
+        aux["likes_to_PODEMOS"] = aux["likes_to_PODEMOS"] + (likes_to_PODEMOS or 0)
+        aux["likes_to_CIUDADANOS"] = aux["likes_to_CIUDADANOS"] + (likes_to_CIUDADANOS or 0)
+        aux["likes_to_VOX"] = aux["likes_to_VOX"] + (likes_to_VOX or 0)
+        aux["likes_to_COMPROMIS"] = aux["likes_to_COMPROMIS"] + (likes_to_COMPROMIS or 0)
+        aux["last_like_registered"] = str(datetime.now())
+        aux["tweet_ids_liked_list"].append(tweet_id)
+        special_doc_dict[user_id] = aux
 
 
-
-insert_statistics_file_in_collection({"jajaj":1,"way_of_send_counter":{}},"cambio_proceso")
+    if nuevo_fichero:
+        print("[MONGO INSERT {0} INFO] Inserting new {0}".format(logs["upper_name"]))
+        db[collection].insert(special_doc_dict)
+        print("[MONGO INSERT {0} INFO] The {0} has been save sucessfully".format(logs["upper_name"]))
+    else:
+        print("[MONGO INSERT {0} INFO] Replacing {0}".format(logs["upper_name"]))
+        db[collection].replace_one({"_id" : likes_count_file_id },special_doc_dict)
+        print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
+    
