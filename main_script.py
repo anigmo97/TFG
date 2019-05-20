@@ -629,7 +629,30 @@ def do_likes_count_actions(collection):
                             auxiliar = v 
                             auxiliar["counted"] = True
                             aux[k] = auxiliar
-                    mongo_conector.db[collection].update({'_id':tweet_id}, {'$set': {"likes_info.users_who_liked":aux,"likes_info.likes_count_updated":True}})  
+                    mongo_conector.db[collection].update({'_id':tweet_id}, {'$set': {"likes_info.users_who_liked":aux,"likes_info.likes_count_updated":True}})
+                else:
+                    mongo_conector.db[collection].update({'_id':tweet_id}, {'$set': {"likes_info.likes_count_updated":True}})
+    
+    # GET ADDITIONAL INFO OF USERS WHO LIKED
+    likes_count_files = mongo_conector.get_likes_count_files(collection)
+    i=1
+    for e in likes_count_files:
+        aux = e.copy()
+        for x in e:
+            if x != "_id":
+                try:
+                    verified,joined,tweets,following,followers,favourites = twitter_web_consumer.get_user_info_without_navegator(e[x]["user_screen_name"])
+                    aux[x]["verified"] = verified
+                    aux[x]["joined"] = joined
+                    aux[x]["tweets"] = tweets
+                    aux[x]["following"] = following
+                    aux[x]["followers"] = followers
+                    aux[x]["favourites"] = favourites
+                except Exception as ex:
+                    print(e[x]["user_screen_name"])
+            print(i)
+            i+=1
+    mongo_conector.replace_likes_count_file(mongo_conector.current_collection,aux)
                         
                     
 
@@ -774,8 +797,22 @@ if __name__ == "__main__":
                 if args.partido =="CS":
                     args.partido = "CIUDADANOS"
             for screen_name in args.query_user:
-                screen_name = remove_at_sign(screen_name)
+                screen_name = remove_at_sign(screen_name).lower()
                 tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=screen_name,max_tweets =(args.max_messages or 3000),partido=args.partido)
+                # GET ADDITIONAL INFO OF SEARCHED_USERS 
+                searched_users_file = mongo_conector.get_searched_users_file(mongo_conector.current_collection)
+                aux = searched_users_file[screen_name.lower()].copy()
+                try:
+                    verified,joined,tweets,following,followers,favourites = twitter_web_consumer.get_user_info_without_navegator(searched_users_file[screen_name]["user"])
+                    searched_users_file[screen_name]["verified"] = verified
+                    searched_users_file[screen_name]["joined"] = joined
+                    searched_users_file[screen_name]["tweets"] = tweets
+                    searched_users_file[screen_name]["following"] = following
+                    searched_users_file[screen_name]["followers"] = followers
+                    searched_users_file[screen_name]["favourites"] = favourites
+                    mongo_conector.replace_searched_users_file(mongo_conector.current_collection,searched_users_file)
+                except Exception as ex:
+                    print(searched_users_file[screen_name])
 
         elif checkParameter(args.streamming): # -s option
             argumentos_funcion = (args.words or ["futbol","#music"], args.max_messages or 10000, args.max_time or 10)
@@ -830,12 +867,28 @@ if __name__ == "__main__":
                 for user in users:
                     if user != "_id" and user != "total_captured_tweets":
                         print("user = {}".format(user))
+                        user=user.lower()
                         max_tweet_id = searched_users_file[user]["max_tweet_id"]
                         if checkParameter(args.max_messages) > 0:
                             tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(max_tweets=args.max_messages,user_screen_name=user,until_tweet_id=max_tweet_id)
                         else:
                             tweets_files_list = consumer.collect_tweets_by_user_and_save_in_mongo(user_screen_name=user,until_tweet_id=max_tweet_id)
+                        # GET ADDITIONAL INFO OF SEARCHED_USERS 
+                        aux = searched_users_file[user.lower()].copy()
+                        try:
+                            verified,joined,tweets,following,followers,favourites = twitter_web_consumer.get_user_info_without_navegator(searched_users_file[user.lower]["user"])
+                            searched_users_file[user]["verified"] = verified
+                            searched_users_file[user]["joined"] = joined
+                            searched_users_file[user]["tweets"] = tweets
+                            searched_users_file[user]["following"] = following
+                            searched_users_file[user]["followers"] = followers
+                            searched_users_file[user]["favourites"] = favourites
+                            mongo_conector.replace_searched_users_file(mongo_conector.current_collection,searched_users_file)
+                        except Exception as ex:
+                            print(searched_users_file[user]["user_screen_name"])
+                        
                 cond = args.loop
+            
 
         elif checkParameter(args.likes): # --likes option
             if args.likes_method.lower == "relevance":

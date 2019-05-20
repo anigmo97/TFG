@@ -16,7 +16,7 @@ now = datetime.datetime.now()
 
 consumer_key = ""
 consumer_secret = ""
-access_token = ""
+access_token = "-"
 access_secret = ""
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_secret)
@@ -221,10 +221,11 @@ def collect_tweets_by_user_and_save_in_mongo(user_screen_name,max_tweets=3000,un
 
         tweets_sin_repetir = mongo_conector.insertar_multiples_tweets_en_mongo_v2(mongo_tweets_dict,mongo_tweets_id_list,mongo_conector.current_collection)
         print("{} tweets nuevos capturados ".format(len(tweets_sin_repetir)))
-
-        user_id = API.get_user(screen_name = user_screen_name).id_str
+        user_info = API.get_user(screen_name = user_screen_name)
+        user_id = user_info.id_str
+        user_name = user_info.name
         mongo_conector.insert_or_update_searched_users_file(mongo_conector.current_collection,
-        user_screen_name,user_id,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,
+        user_screen_name,user_id,user_name,len(tweets_sin_repetir),min_tweet_id,max_tweet_id,
         min_creation_date,max_creation_date,partido)
     else:
         return []

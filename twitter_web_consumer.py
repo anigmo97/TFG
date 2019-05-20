@@ -11,6 +11,7 @@ from threading import Thread
 from lxml.html import parse
 import time
 import pyperclip #pip3 install pyperclip   if error -> sudo apt install xsel
+import locale
 try: 
     from BeautifulSoup import BeautifulSoup
 except ImportError:
@@ -172,7 +173,53 @@ def get_last_users_who_liked_a_tweet_without_navegator(screen_name, tweet_id):
 	except:
 		print("Error scraping webpage without navegator {}".format(url))
 		return 0,{}
-	
+
+
+def get_user_info_without_navegator(screen_name):
+	url = 'https://twitter.com/'+screen_name
+	html = urllib.request.urlopen(url)
+	soup = BeautifulSoup(html.read(),'html.parser')
+	try:
+		verified = soup.select_one("h1.ProfileHeaderCard-name>span.ProfileHeaderCard-badges") != None
+		joined = soup.select_one(".ProfileHeaderCard-joinDateText.js-tooltip.u-dir")
+		if joined != None:
+			joined = joined.get("title")
+		tweets = soup.select_one(".ProfileNav-item.ProfileNav-item--tweets>a")
+		if tweets != None:
+			tweets = tweets.get("title")
+			tweets_formatted = int(tweets.split()[0].replace(".",""))
+		else:
+			tweets_formatted=0
+
+		following = soup.select_one(".ProfileNav-item.ProfileNav-item--following>a")
+		if following != None:
+			following = following.get("title")
+			following_formatted = int(following.split()[0].replace(".",""))
+		else:
+			following_formatted=0
+
+		followers = soup.select_one(".ProfileNav-item.ProfileNav-item--followers>a")
+		if followers != None:
+			followers = followers.get("title")
+			followers_formatted = int(followers.split()[0].replace(".",""))
+		else:
+			followers_formatted=0
+
+		favourites = soup.select_one(".ProfileNav-item.ProfileNav-item--favorites>a")
+		if favourites != None:
+			favourites = favourites.get("title")
+			favourites_formatted = int(favourites.split()[0].replace(".",""))
+		else:
+			favourites_formatted=0
+
+		
+		
+		
+		return verified,joined,tweets_formatted,following_formatted,followers_formatted,favourites_formatted
+	except Exception as e:
+		print(e)
+		print("Error scraping webpage without navegator {}".format(url))
+		return None
 	
 
 
@@ -483,9 +530,10 @@ def get_last_users_who_like_last_n_tweets_of_user(user_screen_name,num_tweets,dr
 if __name__ == '__main__':
 	#driver = open_twitter_and_login()
 	#get_embed_html_of_a_tweet(screen_name="Albert_Rivera",tweet_id="1100127150420754438",driver=driver)
-	time_init = datetime.datetime.now()
-	#get_last_users_who_like_last_n_tweets_of_user("Albert_Rivera",10,driver)
-	print(get_last_users_who_liked_a_tweet_without_navegator("Albert_Rivera","1118120339937136641"))
-	#print(soup)
-	print(datetime.datetime.now()-time_init)
-	#driver.close()
+	# time_init = datetime.datetime.now()
+	# #get_last_users_who_like_last_n_tweets_of_user("Albert_Rivera",10,driver)
+	# print(get_last_users_who_liked_a_tweet_without_navegator("Albert_Rivera","1118120339937136641"))
+	# #print(soup)
+	# print(datetime.datetime.now()-time_init)
+	# #driver.close()
+	get_user_info_without_navegator("generalitat")

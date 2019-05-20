@@ -237,6 +237,7 @@ def get_tweets_to_count_likes(collection,limit=0):
     #TODO change
     lista_tweets = list(db[collection].find({"has_likes_info" : True,"likes_info.likes_count_updated":False ,'_id': {'$nin': special_doc_ids,"$regex":"^(?!likes_count_file)"}}).limit(limit))
     print("[TWEETS FOR COUNT LIKES] {} tweets retrieved".format(len(lista_tweets)))
+    print("{}".format([x["_id"] for x in lista_tweets]))
     return lista_tweets
 
 
@@ -382,6 +383,15 @@ def insertar_multiples_tweets_en_mongo_v2(mongo_tweets_dict,mongo_tweets_ids_lis
 ############################### SPECIAL DOCS MANAGEMENT ##################################
 ##########################################################################################
 
+def get_num_of_captured_likes_for_user(screen_name,collection):
+    cursor_resultados = db[collection].find({"user.screen_name": screen_name})
+    likes_capturados = 0
+    for e in cursor_resultados:
+        if e["has_likes_info"]:
+            likes_capturados+= len(e["likes_info"]["users_who_liked"])
+    return likes_capturados
+
+
 def do_additional_actions_for_statistics_file(statistics_dict,collection):
     """Do a preprocess to treat the keys with '.' """
     print("[MONGO STATISTICS INFO] Changing bullets for dots")
@@ -508,7 +518,7 @@ def update_common_management_special_doc_dict(dict_for_update,max_tweet_id,min_t
     return aux
 
 def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date,file_id,
-            query=None,words=None,words_comprobation=None,user=None,user_id=None,partido=None):
+            query=None,words=None,words_comprobation=None,user=None,user_id=None,user_name=None,partido=None):
     """Inserts an special file with common form (query_file, searched_user_files and streamming_file) in a collection """
     print("[INSERT OR UPDATE SPECIAL FILE INFO]")
     if file_id not in special_doc_ids  and not file_id.startswith("likes_count_file_id"):
@@ -558,6 +568,7 @@ def _insert_or_update_special_file(collection,captured_tweets, min_tweet_id, max
             aux["user"] = user
             aux["user_id"] = user_id
             aux["partido"] = partido
+            aux["user_name"] = user_name
             special_doc_dict[user]= aux
         else:
             print("[INSERT OR UPDATE {0} INFO] User is in {0} already (collection {1}), updating entry ...".format(logs["upper_name"],collection))
@@ -591,11 +602,11 @@ def insert_or_update_query_file_streamming(collection, words_list ,captured_twee
     
 
 
-def insert_or_update_searched_users_file(collection, user,user_id,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date,partido):
+def insert_or_update_searched_users_file(collection, user,user_id,user_name,captured_tweets, min_tweet_id, max_tweet_id, min_creation_date, max_creation_date,partido):
     """Inserts searched users file in a collection"""
     user= user.lower()
     _insert_or_update_special_file(collection=collection,captured_tweets=captured_tweets, min_tweet_id=min_tweet_id, max_tweet_id=max_tweet_id,min_creation_date = min_creation_date, max_creation_date=max_creation_date,
-     file_id=searched_users_file_id,user=user,user_id=user_id,partido=partido)
+     file_id=searched_users_file_id,user=user,user_id=user_id,user_name=user_name,partido=partido)
 
 
 def insert_or_update_likes_count_files(collection,user_id, user_screen_name,likes_to_PP,likes_to_PSOE,likes_to_PODEMOS,likes_to_CIUDADANOS,likes_to_VOX,likes_to_COMPROMIS,tweet_id):
@@ -617,12 +628,11 @@ def insert_or_update_likes_count_files(collection,user_id, user_screen_name,like
         print("[INSERT OR UPDATE {0} INFO] There is {0} in collection {1}".format(logs["upper_name"],collection))
     else:
         print("[INSERT OR UPDATE {0} INFO] There is NO {0} in collection {1}".format(logs["upper_name"],collection))
-        if len(likes_count_files)>0 and len(likes_count_files[-1])< 6: #TODO put 50001
+        if len(likes_count_files)>0 and len(likes_count_files[-1])< 6000: #TODO put 50001
             special_doc_dict = likes_count_files[-1]
         else:
             special_doc_dict = { "_id" : "likes_count_file_id_" + str(len(likes_count_files))}
             nuevo_fichero =True
-    input()
         
 
     if user_id not in special_doc_dict:
@@ -662,7 +672,12 @@ def insert_or_update_likes_count_files(collection,user_id, user_screen_name,like
         db[collection].replace_one({"_id" : special_doc_dict["_id"] },special_doc_dict)
         print("[MONGO INSERT {0} INFO] The {0} has been replaced and save sucessfully".format(logs["upper_name"]))
     
+def replace_likes_count_file(collection,likes_count_file):
+    db[collection].replace_one({"_id" : likes_count_file["_id"] },likes_count_file,upsert=True)
 
+def replace_searched_users_file(collection,new_file):
+    db[collection].replace_one({"_id" : searched_users_file_id },new_file,upsert=True)
+    
 
 
 def insert_tweet_of_searched_users_not_captured_yet_file(special_doc_dict,collection):
@@ -772,7 +787,7 @@ def mark_likes_as_not_counted(collection):
     mongo_cursor = db[collection].find({"has_likes_info":True, '_id': {'$nin': special_doc_ids,"$regex":"^(?!likes_count_file)" }},{"_id": 1, "likes_info.users_who_liked":1})
     for e in mongo_cursor:
         doc_id = e["_id"]
-        print(e)
+        #print(e)
         users_who_liked = e["likes_info"]["users_who_liked"].copy()
         for i in users_who_liked:
              users_who_liked[i]["counted"] = False
