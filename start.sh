@@ -1,8 +1,8 @@
 #!/bin/bash
 
 LIKES_PER_30_MIN_RATIO=30
-INITIAL_TWEETS=20
-COLECCION="likes_count_particioned"
+INITIAL_TWEETS=1
+COLECCION="likes_count_particioned3"
 
 
 POLITICOS_PP="@populares @ppcv @pablocasado_ @TeoGarciaEgea @Rafa_Hernando @DolorsMM @Ignacos @Albiol_XG @ALevySoler @IdiazAyuso"
@@ -12,14 +12,15 @@ POLITICOS_CS="@ciudadanosCS @CsValencia_C @albert_rivera @CiudadanoVille @Giraut
 POLITICOS_VOX="@vox_es @VOX_VLC_Ciudad @santi_abascal @ortega_smith @monasterioR @ivanedlm"
 POLITICOS_COMPROMIS="@compromis @CompromisVLC @enricmorera @monicaoltra @joanbaldovi @franferri_ @joanribo @perefuset @giuseppegrezzi"
 
-# python3 main_script.py -c $COLECCION -qu $POLITICOS_PP -p PP -mm $INITIAL_TWEETS
-# python3 main_script.py -c $COLECCION -qu $POLITICOS_PSOE -p PSOE -mm $INITIAL_TWEETS
-# python3 main_script.py -c $COLECCION -qu $POLITICOS_PODEMOS -p PODEMOS -mm $INITIAL_TWEETS
-# python3 main_script.py -c $COLECCION -qu $POLITICOS_CS -p CS -mm $INITIAL_TWEETS
-# python3 main_script.py -c $COLECCION -qu $POLITICOS_VOX -p VOX -mm $INITIAL_TWEETS
-# python3 main_script.py -c $COLECCION -qu $POLITICOS_COMPROMIS -p COMPROMIS -mm $INITIAL_TWEETS
+python3 main_script.py -c $COLECCION -qu $POLITICOS_PP -p PP -mm $INITIAL_TWEETS
+python3 main_script.py -c $COLECCION -qu $POLITICOS_PSOE -p PSOE -mm $INITIAL_TWEETS
+python3 main_script.py -c $COLECCION -qu $POLITICOS_PODEMOS -p PODEMOS -mm $INITIAL_TWEETS
+python3 main_script.py -c $COLECCION -qu $POLITICOS_CS -p CS -mm $INITIAL_TWEETS
+python3 main_script.py -c $COLECCION -qu $POLITICOS_VOX -p VOX -mm $INITIAL_TWEETS
+python3 main_script.py -c $COLECCION -qu $POLITICOS_COMPROMIS -p COMPROMIS -mm $INITIAL_TWEETS
 
 
-# python3 main_script.py -a -c $COLECCION
+python3 main_script.py -a -c $COLECCION
 python3 main_script.py -c $COLECCION --likes -im $INITIAL_TWEETS -lr $LIKES_PER_30_MIN_RATIO -likes_method LAST_N -likes_parser HTML_PARSER
+python3 main_script.py -c $COLECCION --likes_count --forced
 #python3 main_script.py -cu $COLECCION 

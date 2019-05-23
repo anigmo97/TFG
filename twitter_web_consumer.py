@@ -174,8 +174,20 @@ def get_last_users_who_liked_a_tweet_without_navegator(screen_name, tweet_id):
 		print("Error scraping webpage without navegator {}".format(url))
 		return 0,{}
 
+def format_joined_date(date_str):
+	repl = { "ene" : "jan", "abr": "apr", "ago":"aug" ,"sept":"sep","dic":"dec"}
+	for k,v in repl.items():
+		date_str = date_str.replace(k,v)
+
+	out_format = "%Y/%m/%d %H:%M"
+	input_format="%H:%M - %d %b. %Y"
+
+	date_time_obj = datetime.datetime.strptime(date_str,input_format)
+	date_time_str = date_time_obj.strftime(out_format)
+	return date_time_str
 
 def get_user_info_without_navegator(screen_name):
+
 	url = 'https://twitter.com/'+screen_name
 	html = urllib.request.urlopen(url)
 	soup = BeautifulSoup(html.read(),'html.parser')
@@ -184,6 +196,7 @@ def get_user_info_without_navegator(screen_name):
 		joined = soup.select_one(".ProfileHeaderCard-joinDateText.js-tooltip.u-dir")
 		if joined != None:
 			joined = joined.get("title")
+			joined = format_joined_date(joined)
 		tweets = soup.select_one(".ProfileNav-item.ProfileNav-item--tweets>a")
 		if tweets != None:
 			tweets = tweets.get("title")
